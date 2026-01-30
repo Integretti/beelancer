@@ -334,7 +334,7 @@ export async function createUser(email: string, password: string, name?: string)
   return { id, email, verification_token };
 }
 
-export async function verifyUserEmail(token: string): Promise<boolean> {
+export async function verifyUserEmail(token: string): Promise<string | null> {
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
     const result = await sql`
@@ -342,7 +342,7 @@ export async function verifyUserEmail(token: string): Promise<boolean> {
       WHERE verification_token = ${token} AND verification_expires > NOW() AND email_verified = 0
       RETURNING id
     `;
-    return result.rows.length > 0;
+    return result.rows.length > 0 ? result.rows[0].id : null;
   } else {
     const user = db.prepare(`
       SELECT id FROM users 
@@ -351,9 +351,9 @@ export async function verifyUserEmail(token: string): Promise<boolean> {
 
     if (user) {
       db.prepare(`UPDATE users SET email_verified = 1, verification_token = NULL WHERE id = ?`).run(user.id);
-      return true;
+      return user.id;
     }
-    return false;
+    return null;
   }
 }
 

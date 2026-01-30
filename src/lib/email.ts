@@ -30,7 +30,7 @@ export async function sendVerificationEmail(email: string, code: string, name?: 
           <div style="max-width: 480px; margin: 0 auto; background: linear-gradient(180deg, #1f1f1f 0%, #141414 100%); border-radius: 16px; padding: 40px; border: 1px solid #2a2a2a;">
             <div style="text-align: center; margin-bottom: 32px;">
               <div style="font-size: 56px; margin-bottom: 8px;">🐝</div>
-              <h1 style="font-family: 'Space Grotesk', sans-serif; margin: 0; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-size: 28px; font-weight: 700;">${greeting}</h1>
+              <h1 style="font-family: 'Space Grotesk', sans-serif; margin: 0; color: #fbbf24; font-size: 28px; font-weight: 700;">${greeting}</h1>
               <p style="color: #888; margin: 8px 0 0; font-size: 15px;">Welcome to the hive.</p>
             </div>
             
@@ -38,8 +38,8 @@ export async function sendVerificationEmail(email: string, code: string, name?: 
               You're one step away from buzzing with the swarm. Enter this code to verify your account:
             </p>
             
-            <div style="background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.1) 100%); border: 2px solid rgba(251, 191, 36, 0.3); border-radius: 12px; padding: 24px; text-align: center; margin: 0 0 24px;">
-              <code style="font-family: 'Space Grotesk', monospace; font-size: 36px; font-weight: 700; letter-spacing: 6px; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">${code}</code>
+            <div style="background: #2a2310; border: 2px solid #fbbf24; border-radius: 12px; padding: 24px; text-align: center; margin: 0 0 24px;">
+              <code style="font-family: 'Space Grotesk', monospace; font-size: 36px; font-weight: 700; letter-spacing: 6px; color: #fbbf24;">${code}</code>
             </div>
             
             <p style="color: #666; font-size: 14px; line-height: 1.5; margin: 0; text-align: center;">

@@ -9,7 +9,6 @@ export default function VerifyPage() {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,39 +30,13 @@ export default function VerifyPage() {
         return;
       }
 
-      setSuccess(true);
+      // Redirect to dashboard - they're now logged in
+      router.push(data.redirect || '/dashboard');
     } catch (err) {
       setError('Network error');
+      setLoading(false);
     }
-    setLoading(false);
   };
-
-  if (success) {
-    return (
-      <main className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-950 to-black flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <Link href="/" className="inline-flex items-center gap-2 group">
-              <span className="text-3xl group-hover:animate-bounce">🐝</span>
-              <span className="text-2xl font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">Beelancer</span>
-            </Link>
-          </div>
-
-          <div className="bg-gradient-to-b from-gray-900/80 to-gray-900/40 border border-gray-800/50 rounded-2xl p-8 text-center backdrop-blur-sm">
-            <div className="text-5xl mb-4">🎉</div>
-            <h1 className="text-xl font-display font-semibold text-white mb-2">You're in the hive!</h1>
-            <p className="text-gray-400 mb-6">Your email is verified and your account is ready to buzz.</p>
-            <Link 
-              href="/login" 
-              className="inline-block bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black px-6 py-3 rounded-xl font-semibold transition-all hover:shadow-lg hover:shadow-yellow-500/20"
-            >
-              Log in and start buzzing →
-            </Link>
-          </div>
-        </div>
-      </main>
-    );
-  }
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-950 to-black flex items-center justify-center p-4">
