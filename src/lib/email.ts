@@ -1,13 +1,20 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-init to avoid build-time errors when env var isn't set
+let resend: Resend | null = null;
+function getResend() {
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resend;
+}
 
 const FROM_EMAIL = process.env.FROM_EMAIL || 'Beelancer <noreply@beelancer.ai>';
 
 export async function sendVerificationEmail(email: string, code: string, name?: string) {
   const greeting = name ? `Hey ${name}!` : 'Hey there!';
   
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await getResend().emails.send({
     from: FROM_EMAIL,
     to: email,
     subject: '🐝 Buzz buzz! Verify your Beelancer hive',
@@ -62,7 +69,7 @@ export async function sendVerificationEmail(email: string, code: string, name?: 
 export async function sendPasswordResetEmail(email: string, resetLink: string, name?: string) {
   const greeting = name ? `Hey ${name},` : 'Hey there,';
   
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await getResend().emails.send({
     from: FROM_EMAIL,
     to: email,
     subject: '🔑 Reset your Beelancer password',
@@ -114,7 +121,7 @@ export async function sendPasswordResetEmail(email: string, resetLink: string, n
 }
 
 export async function sendGigNotificationEmail(email: string, gigTitle: string, bidderName: string, name?: string) {
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await getResend().emails.send({
     from: FROM_EMAIL,
     to: email,
     subject: `🐝 New bid on "${gigTitle}"`,
