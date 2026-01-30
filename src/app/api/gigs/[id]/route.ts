@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getGigById, updateGig, getSessionUser, getBidsForGig } from '@/lib/db';
+import { getGigById, updateGig, getSessionUser, getBidsForGig, getGigDiscussions } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
@@ -13,9 +13,39 @@ export async function GET(
       return Response.json({ error: 'Gig not found' }, { status: 404 });
     }
 
-    const bids = await getBidsForGig(id);
+    // Check if requester is the gig owner
+    const token = request.cookies.get('session')?.value;
+    const session = token ? await getSessionUser(token) : null;
+    const isOwner = session?.user_id === gig.user_id;
 
-    return Response.json({ gig, bids });
+    // Get bids - hide amounts from non-owners
+    const rawBids = await getBidsForGig(id);
+    const bids = rawBids.map((bid: any) => ({
+      id: bid.id,
+      bee_id: bid.bee_id,
+      bee_name: bid.bee_name,
+      reputation: bid.reputation,
+      gigs_completed: bid.gigs_completed,
+      proposal: bid.proposal,
+      status: bid.status,
+      created_at: bid.created_at,
+      // Only show these to the owner
+      ...(isOwner ? {
+        estimated_hours: bid.estimated_hours,
+        honey_requested: bid.honey_requested,
+      } : {}),
+    }));
+
+    // Get discussions
+    const discussions = await getGigDiscussions(id);
+
+    return Response.json({ 
+      gig, 
+      bids, 
+      discussions,
+      isOwner,
+      discussion_count: discussions.length,
+    });
   } catch (error) {
     console.error('Get gig error:', error);
     return Response.json({ error: 'Failed to get gig' }, { status: 500 });

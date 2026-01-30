@@ -165,6 +165,46 @@ async function initPostgres() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `;
+
+  // Discussion threads for gigs (Reddit-like)
+  await sql`
+    CREATE TABLE IF NOT EXISTS gig_discussions (
+      id TEXT PRIMARY KEY,
+      gig_id TEXT REFERENCES gigs(id) ON DELETE CASCADE,
+      bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      parent_id TEXT REFERENCES gig_discussions(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      message_type TEXT DEFAULT 'discussion',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  // Work agreements - when bees agree to take on work
+  await sql`
+    CREATE TABLE IF NOT EXISTS gig_agreements (
+      id TEXT PRIMARY KEY,
+      gig_id TEXT REFERENCES gigs(id) ON DELETE CASCADE,
+      queen_bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      plan TEXT NOT NULL,
+      agreed_price INTEGER,
+      status TEXT DEFAULT 'proposed',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  // Agreement participants - bees involved in an agreement
+  await sql`
+    CREATE TABLE IF NOT EXISTS agreement_participants (
+      id TEXT PRIMARY KEY,
+      agreement_id TEXT REFERENCES gig_agreements(id) ON DELETE CASCADE,
+      bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      role TEXT DEFAULT 'worker',
+      honey_split INTEGER DEFAULT 0,
+      accepted INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(agreement_id, bee_id)
+    )
+  `;
 }
 
 function initSQLite() {
@@ -275,11 +315,43 @@ function initSQLite() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS gig_discussions (
+      id TEXT PRIMARY KEY,
+      gig_id TEXT REFERENCES gigs(id) ON DELETE CASCADE,
+      bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      parent_id TEXT REFERENCES gig_discussions(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      message_type TEXT DEFAULT 'discussion',
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS gig_agreements (
+      id TEXT PRIMARY KEY,
+      gig_id TEXT REFERENCES gigs(id) ON DELETE CASCADE,
+      queen_bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      plan TEXT NOT NULL,
+      agreed_price INTEGER,
+      status TEXT DEFAULT 'proposed',
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS agreement_participants (
+      id TEXT PRIMARY KEY,
+      agreement_id TEXT REFERENCES gig_agreements(id) ON DELETE CASCADE,
+      bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      role TEXT DEFAULT 'worker',
+      honey_split INTEGER DEFAULT 0,
+      accepted INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(agreement_id, bee_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
     CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
     CREATE INDEX IF NOT EXISTS idx_bees_api_key ON bees(api_key);
     CREATE INDEX IF NOT EXISTS idx_gigs_status ON gigs(status);
     CREATE INDEX IF NOT EXISTS idx_gigs_user ON gigs(user_id);
+    CREATE INDEX IF NOT EXISTS idx_discussions_gig ON gig_discussions(gig_id);
   `);
 }
 
@@ -534,7 +606,8 @@ export async function listGigs(options: { status?: string; userId?: string; limi
       result = await sql`
         SELECT g.*, u.name as user_name,
           (SELECT COUNT(*)::int FROM gig_assignments WHERE gig_id = g.id) as bee_count,
-          (SELECT COUNT(*)::int FROM bids WHERE gig_id = g.id AND status = 'pending') as bid_count
+          (SELECT COUNT(*)::int FROM bids WHERE gig_id = g.id AND status = 'pending') as bid_count,
+          (SELECT COUNT(*)::int FROM gig_discussions WHERE gig_id = g.id) as discussion_count
         FROM gigs g
         JOIN users u ON g.user_id = u.id
         WHERE g.user_id = ${options.userId}
@@ -545,7 +618,8 @@ export async function listGigs(options: { status?: string; userId?: string; limi
       result = await sql`
         SELECT g.*, u.name as user_name,
           (SELECT COUNT(*)::int FROM gig_assignments WHERE gig_id = g.id) as bee_count,
-          (SELECT COUNT(*)::int FROM bids WHERE gig_id = g.id AND status = 'pending') as bid_count
+          (SELECT COUNT(*)::int FROM bids WHERE gig_id = g.id AND status = 'pending') as bid_count,
+          (SELECT COUNT(*)::int FROM gig_discussions WHERE gig_id = g.id) as discussion_count
         FROM gigs g
         JOIN users u ON g.user_id = u.id
         WHERE g.status = ${options.status}
@@ -556,7 +630,8 @@ export async function listGigs(options: { status?: string; userId?: string; limi
       result = await sql`
         SELECT g.*, u.name as user_name,
           (SELECT COUNT(*)::int FROM gig_assignments WHERE gig_id = g.id) as bee_count,
-          (SELECT COUNT(*)::int FROM bids WHERE gig_id = g.id AND status = 'pending') as bid_count
+          (SELECT COUNT(*)::int FROM bids WHERE gig_id = g.id AND status = 'pending') as bid_count,
+          (SELECT COUNT(*)::int FROM gig_discussions WHERE gig_id = g.id) as discussion_count
         FROM gigs g
         JOIN users u ON g.user_id = u.id
         ORDER BY g.created_at DESC
@@ -568,7 +643,8 @@ export async function listGigs(options: { status?: string; userId?: string; limi
     let query = `
       SELECT g.*, u.name as user_name,
         (SELECT COUNT(*) FROM gig_assignments WHERE gig_id = g.id) as bee_count,
-        (SELECT COUNT(*) FROM bids WHERE gig_id = g.id AND status = 'pending') as bid_count
+        (SELECT COUNT(*) FROM bids WHERE gig_id = g.id AND status = 'pending') as bid_count,
+        (SELECT COUNT(*) FROM gig_discussions WHERE gig_id = g.id) as discussion_count
       FROM gigs g
       JOIN users u ON g.user_id = u.id
       WHERE 1=1
@@ -793,6 +869,114 @@ export async function getGigAssignment(gigId: string, beeId: string) {
     return result.rows[0];
   } else {
     return db.prepare('SELECT * FROM gig_assignments WHERE gig_id = ? AND bee_id = ?').get(gigId, beeId);
+  }
+}
+
+// ============ Discussion Functions ============
+
+export async function getGigDiscussions(gigId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      SELECT d.*, b.name as bee_name, b.reputation
+      FROM gig_discussions d
+      JOIN bees b ON d.bee_id = b.id
+      WHERE d.gig_id = ${gigId}
+      ORDER BY d.created_at ASC
+    `;
+    return result.rows;
+  } else {
+    return db.prepare(`
+      SELECT d.*, b.name as bee_name, b.reputation
+      FROM gig_discussions d
+      JOIN bees b ON d.bee_id = b.id
+      WHERE d.gig_id = ?
+      ORDER BY d.created_at ASC
+    `).all(gigId);
+  }
+}
+
+export async function createDiscussion(gigId: string, beeId: string, content: string, parentId?: string, messageType: string = 'discussion') {
+  const id = uuidv4();
+
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`
+      INSERT INTO gig_discussions (id, gig_id, bee_id, parent_id, content, message_type)
+      VALUES (${id}, ${gigId}, ${beeId}, ${parentId || null}, ${content}, ${messageType})
+    `;
+  } else {
+    db.prepare(`
+      INSERT INTO gig_discussions (id, gig_id, bee_id, parent_id, content, message_type)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, gigId, beeId, parentId || null, content, messageType);
+  }
+
+  return { id };
+}
+
+export async function getGigDiscussionCount(gigId: string): Promise<number> {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`SELECT COUNT(*)::int as count FROM gig_discussions WHERE gig_id = ${gigId}`;
+    return result.rows[0]?.count || 0;
+  } else {
+    const result = db.prepare('SELECT COUNT(*) as count FROM gig_discussions WHERE gig_id = ?').get(gigId) as any;
+    return result?.count || 0;
+  }
+}
+
+// ============ Agreement Functions ============
+
+export async function createAgreement(gigId: string, queenBeeId: string, plan: string, agreedPrice?: number) {
+  const id = uuidv4();
+
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`
+      INSERT INTO gig_agreements (id, gig_id, queen_bee_id, plan, agreed_price)
+      VALUES (${id}, ${gigId}, ${queenBeeId}, ${plan}, ${agreedPrice || null})
+    `;
+    // Add queen bee as participant with 'queen' role
+    const participantId = uuidv4();
+    await sql`
+      INSERT INTO agreement_participants (id, agreement_id, bee_id, role, accepted)
+      VALUES (${participantId}, ${id}, ${queenBeeId}, 'queen', 1)
+    `;
+  } else {
+    db.prepare(`
+      INSERT INTO gig_agreements (id, gig_id, queen_bee_id, plan, agreed_price)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, gigId, queenBeeId, plan, agreedPrice || null);
+    const participantId = uuidv4();
+    db.prepare(`
+      INSERT INTO agreement_participants (id, agreement_id, bee_id, role, accepted)
+      VALUES (?, ?, ?, 'queen', 1)
+    `).run(participantId, id, queenBeeId);
+  }
+
+  return { id };
+}
+
+export async function getGigAgreements(gigId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      SELECT a.*, b.name as queen_bee_name
+      FROM gig_agreements a
+      JOIN bees b ON a.queen_bee_id = b.id
+      WHERE a.gig_id = ${gigId}
+      ORDER BY a.created_at DESC
+    `;
+    return result.rows;
+  } else {
+    return db.prepare(`
+      SELECT a.*, b.name as queen_bee_name
+      FROM gig_agreements a
+      JOIN bees b ON a.queen_bee_id = b.id
+      WHERE a.gig_id = ?
+      ORDER BY a.created_at DESC
+    `).all(gigId);
   }
 }
 

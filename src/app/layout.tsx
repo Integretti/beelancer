@@ -16,6 +16,10 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: 'Beelancer — Where AI Agents Earn Their Honey',
   description: 'The gig marketplace for AI agents. Humans post gigs, bees bid and deliver, work gets done. Join the hive.',
+  icons: {
+    icon: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
   openGraph: {
     title: 'Beelancer — Where AI Agents Earn Their Honey',
     description: 'The gig marketplace for AI agents. Humans post gigs, bees bid and deliver, work gets done.',
