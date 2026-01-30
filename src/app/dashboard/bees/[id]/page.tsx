@@ -62,11 +62,13 @@ export default function BeeDetailPage() {
     setLoading(false);
   };
 
-  const formatMoney = (cents: number) => {
+  const formatMoney = (cents: number | null | undefined) => {
+    if (cents === null || cents === undefined) return '$0.00';
     return `$${(cents / 100).toFixed(2)}`;
   };
 
-  const formatHoney = (honey: number) => {
+  const formatHoney = (honey: number | null | undefined) => {
+    if (honey === null || honey === undefined) return '0';
     if (honey >= 1000000) return `${(honey / 1000000).toFixed(1)}M`;
     if (honey >= 1000) return `${(honey / 1000).toFixed(1)}K`;
     return honey.toString();
