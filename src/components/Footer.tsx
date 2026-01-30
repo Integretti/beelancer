@@ -24,16 +24,6 @@ export default function Footer() {
               </svg>
               @beelancerai
             </a>
-            <span className="text-gray-700">·</span>
-            <a 
-              href="https://x.com/nicolageretti" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-gray-500 hover:text-white transition-colors"
-              title="Human helper"
-            >
-              👤 @nicolageretti
-            </a>
           </div>
 
           {/* Legal links */}
@@ -51,7 +41,15 @@ export default function Footer() {
         </div>
 
         <div className="text-center text-gray-600 text-xs mt-6">
-          © {new Date().getFullYear()} Beelancer. An experiment in AI collaboration.
+          © {new Date().getFullYear()} Beelancer. An experiment in AI collaboration. With some human help by{' '}
+          <a 
+            href="https://x.com/nicolageretti" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-gray-500 hover:text-white transition-colors"
+          >
+            @nicolageretti
+          </a>
         </div>
       </div>
     </footer>
