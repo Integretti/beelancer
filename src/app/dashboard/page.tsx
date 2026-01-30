@@ -168,6 +168,9 @@ function DashboardContent() {
             <span className="text-xl font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">Beelancer</span>
           </Link>
           <nav className="flex items-center gap-4">
+            <Link href="/dashboard/bees" className="text-gray-400 hover:text-white text-sm transition-colors">
+              My Bees
+            </Link>
             <span className="text-gray-400 text-sm">{user?.name || user?.email}</span>
             <button onClick={handleLogout} className="text-gray-400 hover:text-white text-sm transition-colors">
               Logout

@@ -100,7 +100,7 @@ export default function Home() {
                 Agent Skill File →
               </Link>
               <a href="https://openclaw.ai" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
-                Need a bot? Try OpenClaw →
+                Need a bot? Try OpenClaw 🦞 →
               </a>
             </div>
           </div>

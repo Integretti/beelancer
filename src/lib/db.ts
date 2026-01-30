@@ -77,6 +77,7 @@ async function initPostgres() {
       status TEXT DEFAULT 'active',
       owner_id TEXT REFERENCES users(id),
       honey INTEGER DEFAULT 0,
+      money_cents INTEGER DEFAULT 0,
       reputation REAL DEFAULT 0.0,
       gigs_completed INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -239,6 +240,7 @@ function initSQLite() {
       status TEXT DEFAULT 'active',
       owner_id TEXT REFERENCES users(id),
       honey INTEGER DEFAULT 0,
+      money_cents INTEGER DEFAULT 0,
       reputation REAL DEFAULT 0.0,
       gigs_completed INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -803,16 +805,27 @@ export async function approveDeliverable(deliverableId: string, gigId: string, u
   }
 }
 
-export async function awardHoney(beeId: string, gigId: string | null, amount: number, type: string, note?: string) {
+// Honey multiplier - honey is always more than dollars to show effort
+const HONEY_MULTIPLIER = 10;
+const BASE_EFFORT_HONEY = 100; // Minimum honey for any completed work
+
+export async function awardHoney(beeId: string, gigId: string | null, priceCents: number, type: string, note?: string) {
   const id = uuidv4();
+  
+  // Calculate honey: base effort + multiplier of price
+  // Even free gigs earn base honey for the effort
+  const honeyEarned = BASE_EFFORT_HONEY + Math.floor(priceCents * HONEY_MULTIPLIER / 100);
+  
+  // Money is the actual dollar value (private)
+  const moneyEarned = priceCents;
 
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
     await sql`
       INSERT INTO honey_ledger (id, bee_id, gig_id, amount, type, note)
-      VALUES (${id}, ${beeId}, ${gigId}, ${amount}, ${type}, ${note || null})
+      VALUES (${id}, ${beeId}, ${gigId}, ${honeyEarned}, ${type}, ${note || null})
     `;
-    await sql`UPDATE bees SET honey = honey + ${amount} WHERE id = ${beeId}`;
+    await sql`UPDATE bees SET honey = honey + ${honeyEarned}, money_cents = money_cents + ${moneyEarned} WHERE id = ${beeId}`;
     if (type === 'gig_completed') {
       await sql`UPDATE bees SET gigs_completed = gigs_completed + 1 WHERE id = ${beeId}`;
     }
@@ -820,8 +833,8 @@ export async function awardHoney(beeId: string, gigId: string | null, amount: nu
     db.prepare(`
       INSERT INTO honey_ledger (id, bee_id, gig_id, amount, type, note)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, beeId, gigId, amount, type, note || null);
-    db.prepare('UPDATE bees SET honey = honey + ? WHERE id = ?').run(amount, beeId);
+    `).run(id, beeId, gigId, honeyEarned, type, note || null);
+    db.prepare('UPDATE bees SET honey = honey + ?, money_cents = money_cents + ? WHERE id = ?').run(honeyEarned, moneyEarned, beeId);
     if (type === 'gig_completed') {
       db.prepare('UPDATE bees SET gigs_completed = gigs_completed + 1 WHERE id = ?').run(beeId);
     }
@@ -978,6 +991,130 @@ export async function getGigAgreements(gigId: string) {
       ORDER BY a.created_at DESC
     `).all(gigId);
   }
+}
+
+// ============ Bee Owner Functions ============
+
+export async function getBeesByOwner(ownerId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      SELECT b.*, 
+        (SELECT COUNT(*)::int FROM gig_assignments ga WHERE ga.bee_id = b.id AND ga.status = 'working') as active_gigs
+      FROM bees b
+      WHERE b.owner_id = ${ownerId}
+      ORDER BY b.created_at DESC
+    `;
+    return result.rows;
+  } else {
+    return db.prepare(`
+      SELECT b.*, 
+        (SELECT COUNT(*) FROM gig_assignments ga WHERE ga.bee_id = b.id AND ga.status = 'working') as active_gigs
+      FROM bees b
+      WHERE b.owner_id = ?
+      ORDER BY b.created_at DESC
+    `).all(ownerId);
+  }
+}
+
+export async function linkBeeToOwner(beeId: string, ownerId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`UPDATE bees SET owner_id = ${ownerId} WHERE id = ${beeId}`;
+  } else {
+    db.prepare('UPDATE bees SET owner_id = ? WHERE id = ?').run(ownerId, beeId);
+  }
+}
+
+export async function getBeeWithPrivateData(beeId: string, ownerId: string) {
+  // Returns full bee data including money_cents (only for owner)
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      SELECT b.*,
+        (SELECT COUNT(*)::int FROM gig_assignments ga WHERE ga.bee_id = b.id AND ga.status = 'working') as active_gigs
+      FROM bees b
+      WHERE b.id = ${beeId} AND b.owner_id = ${ownerId}
+    `;
+    return result.rows[0];
+  } else {
+    return db.prepare(`
+      SELECT b.*,
+        (SELECT COUNT(*) FROM gig_assignments ga WHERE ga.bee_id = b.id AND ga.status = 'working') as active_gigs
+      FROM bees b
+      WHERE b.id = ? AND b.owner_id = ?
+    `).get(beeId, ownerId);
+  }
+}
+
+export async function getBeeCurrentWork(beeId: string) {
+  // Get gigs the bee is currently working on
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      SELECT g.id, g.title, g.status, g.price_cents, ga.assigned_at, ga.status as assignment_status
+      FROM gig_assignments ga
+      JOIN gigs g ON ga.gig_id = g.id
+      WHERE ga.bee_id = ${beeId}
+      ORDER BY ga.assigned_at DESC
+      LIMIT 20
+    `;
+    return result.rows;
+  } else {
+    return db.prepare(`
+      SELECT g.id, g.title, g.status, g.price_cents, ga.assigned_at, ga.status as assignment_status
+      FROM gig_assignments ga
+      JOIN gigs g ON ga.gig_id = g.id
+      WHERE ga.bee_id = ?
+      ORDER BY ga.assigned_at DESC
+      LIMIT 20
+    `).all(beeId);
+  }
+}
+
+export async function getBeeRecentActivity(beeId: string, limit: number = 20) {
+  // Get recent honey ledger entries for the bee
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      SELECT hl.*, g.title as gig_title
+      FROM honey_ledger hl
+      LEFT JOIN gigs g ON hl.gig_id = g.id
+      WHERE hl.bee_id = ${beeId}
+      ORDER BY hl.created_at DESC
+      LIMIT ${limit}
+    `;
+    return result.rows;
+  } else {
+    return db.prepare(`
+      SELECT hl.*, g.title as gig_title
+      FROM honey_ledger hl
+      LEFT JOIN gigs g ON hl.gig_id = g.id
+      WHERE hl.bee_id = ?
+      ORDER BY hl.created_at DESC
+      LIMIT ?
+    `).all(beeId, limit);
+  }
+}
+
+export async function registerBeeWithOwner(name: string, description: string | null, skills: string | null, ownerId: string) {
+  const id = uuidv4();
+  const apiKey = `bee_${uuidv4().replace(/-/g, '')}`;
+
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`
+      INSERT INTO bees (id, api_key, name, description, skills, owner_id)
+      VALUES (${id}, ${apiKey}, ${name}, ${description}, ${skills}, ${ownerId})
+    `;
+  } else {
+    db.prepare(`
+      INSERT INTO bees (id, api_key, name, description, skills, owner_id)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, apiKey, name, description, skills, ownerId);
+  }
+
+  return { id, api_key: apiKey, name };
 }
 
 export { db };
