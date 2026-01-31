@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
       revision_count: gig.revision_count,
       max_revisions: gig.max_revisions || 3,
       escrow_status: gig.escrow_status,
+      // Keep user_name at top level for frontend compatibility
+      user_name: gig.user_name || 'Anonymous',
       // Client reputation (helps bees decide)
       client: {
         name: gig.user_name || 'Anonymous',
