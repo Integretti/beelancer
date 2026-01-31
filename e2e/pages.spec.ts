@@ -236,6 +236,108 @@ test.describe('API Endpoints Health', () => {
     const data = await response.json();
     expect(Array.isArray(data.gigs)).toBe(true);
   });
+
+  test('gig detail API should work for all gigs (human and bee created)', async ({ request }) => {
+    // Get list of gigs
+    const listResponse = await request.get('/api/gigs?status=open');
+    expect(listResponse.ok()).toBeTruthy();
+    
+    const listData = await listResponse.json();
+    const gigs = listData.gigs;
+    
+    // Test each gig's detail endpoint
+    for (const gig of gigs.slice(0, 5)) { // Test first 5 gigs
+      const detailResponse = await request.get(`/api/gigs/${gig.id}`);
+      
+      expect(detailResponse.ok(), `Gig ${gig.id} (${gig.title}) should be accessible`).toBeTruthy();
+      
+      const detailData = await detailResponse.json();
+      expect(detailData.gig).toBeDefined();
+      expect(detailData.gig.id).toBe(gig.id);
+      expect(detailData.gig.title).toBe(gig.title);
+      
+      // Should have creator info regardless of type
+      if (detailData.gig.creator_type === 'bee') {
+        expect(detailData.gig.creator_bee_name, `Bee-created gig ${gig.id} should have creator_bee_name`).toBeDefined();
+      }
+    }
+  });
+});
+
+test.describe('Gig Pages', () => {
+  test('should load gig detail page for human-created gigs', async ({ page, request }) => {
+    // Get a human-created gig
+    const response = await request.get('/api/gigs?status=open');
+    const data = await response.json();
+    const humanGig = data.gigs.find((g: any) => g.creator_type === 'human');
+    
+    if (!humanGig) {
+      test.skip();
+      return;
+    }
+    
+    await page.goto(`/gig/${humanGig.id}`);
+    await page.waitForLoadState('networkidle');
+    
+    // Should not show error
+    const appError = await page.locator('text=Application error').count();
+    expect(appError).toBe(0);
+    
+    // Title should be visible
+    await expect(page.getByText(humanGig.title)).toBeVisible();
+  });
+
+  test('should load gig detail page for bee-created gigs', async ({ page, request }) => {
+    // Get a bee-created gig
+    const response = await request.get('/api/gigs?status=open');
+    const data = await response.json();
+    const beeGig = data.gigs.find((g: any) => g.creator_type === 'bee');
+    
+    if (!beeGig) {
+      test.skip();
+      return;
+    }
+    
+    await page.goto(`/gig/${beeGig.id}`);
+    await page.waitForLoadState('networkidle');
+    
+    // Should not show error
+    const appError = await page.locator('text=Application error').count();
+    expect(appError).toBe(0);
+    
+    // Title should be visible
+    await expect(page.getByText(beeGig.title)).toBeVisible();
+  });
+
+  test('all gigs on homepage should be clickable and load', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    
+    // Get all gig links
+    const gigLinks = page.locator('a[href^="/gig/"]');
+    const count = await gigLinks.count();
+    
+    // Test first 3 gigs
+    for (let i = 0; i < Math.min(count, 3); i++) {
+      const href = await gigLinks.nth(i).getAttribute('href');
+      if (!href) continue;
+      
+      await page.goto(href);
+      await page.waitForLoadState('networkidle');
+      
+      // Should not show error
+      const appError = await page.locator('text=Application error').count();
+      expect(appError, `Gig page ${href} should not show error`).toBe(0);
+      
+      // Should not show "Gig not found"
+      const notFound = await page.locator('text=Gig not found').count();
+      expect(notFound, `Gig page ${href} should not show not found`).toBe(0);
+      
+      // Go back to homepage for next iteration
+      await page.goto('/');
+      await page.waitForLoadState('networkidle');
+    }
+  });
 });
 
 test.describe('Error Handling', () => {

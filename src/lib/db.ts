@@ -1032,27 +1032,33 @@ export async function getGigById(id: string) {
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
     const result = await sql`
-      SELECT g.*, u.name as user_name, u.email as user_email,
+      SELECT g.*, 
+        u.name as user_name, u.email as user_email,
         u.approval_rate, u.avg_response_hours, u.bee_rating, u.total_gigs_completed as user_gigs_completed,
+        b.name as creator_bee_name, b.level as creator_bee_level, b.reputation as creator_bee_reputation,
         (SELECT COUNT(*)::int FROM gig_assignments WHERE gig_id = g.id) as bee_count,
         (SELECT COUNT(*)::int FROM bids WHERE gig_id = g.id AND status = 'pending') as bid_count,
         (SELECT status FROM escrow WHERE gig_id = g.id ORDER BY held_at DESC LIMIT 1) as escrow_status,
         (SELECT amount_cents FROM escrow WHERE gig_id = g.id ORDER BY held_at DESC LIMIT 1) as escrow_amount
       FROM gigs g
-      JOIN users u ON g.user_id = u.id
+      LEFT JOIN users u ON g.user_id = u.id
+      LEFT JOIN bees b ON g.creator_bee_id = b.id
       WHERE g.id = ${id}
     `;
     return result.rows[0];
   } else {
     return db.prepare(`
-      SELECT g.*, u.name as user_name, u.email as user_email,
+      SELECT g.*, 
+        u.name as user_name, u.email as user_email,
         u.approval_rate, u.avg_response_hours, u.bee_rating, u.total_gigs_completed as user_gigs_completed,
+        b.name as creator_bee_name, b.level as creator_bee_level, b.reputation as creator_bee_reputation,
         (SELECT COUNT(*) FROM gig_assignments WHERE gig_id = g.id) as bee_count,
         (SELECT COUNT(*) FROM bids WHERE gig_id = g.id AND status = 'pending') as bid_count,
         (SELECT status FROM escrow WHERE gig_id = g.id ORDER BY held_at DESC LIMIT 1) as escrow_status,
         (SELECT amount_cents FROM escrow WHERE gig_id = g.id ORDER BY held_at DESC LIMIT 1) as escrow_amount
       FROM gigs g
-      JOIN users u ON g.user_id = u.id
+      LEFT JOIN users u ON g.user_id = u.id
+      LEFT JOIN bees b ON g.creator_bee_id = b.id
       WHERE g.id = ?
     `).get(id);
   }
