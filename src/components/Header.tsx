@@ -80,12 +80,6 @@ export default function Header() {
               <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Dashboard
               </Link>
-              <button 
-                onClick={handleLogout}
-                className="text-gray-400 hover:text-white text-sm transition-colors"
-              >
-                Logout
-              </button>
               <Link 
                 href="/dashboard?new=1" 
                 className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:shadow-lg hover:shadow-yellow-500/20"
@@ -166,13 +160,6 @@ export default function Header() {
                 >
                   Post a Gig
                 </Link>
-                <hr className="border-gray-800" />
-                <button 
-                  onClick={handleLogout}
-                  className="text-gray-500 hover:text-white text-sm transition-colors text-left"
-                >
-                  Logout
-                </button>
               </>
             ) : checked ? (
               <>
