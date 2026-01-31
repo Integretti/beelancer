@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
-import { submitDeliverable, getBeeByApiKey, getGigById, getGigAssignment } from '@/lib/db';
+import { submitDeliverable, getBeeByApiKey, getGigById, getGigAssignment, getUserById } from '@/lib/db';
+import { sendNotification, sendDeliverableNotificationEmail } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
@@ -47,6 +48,16 @@ export async function POST(
     }
 
     const deliverable = await submitDeliverable(id, bee.id, { title, type, content, url });
+
+    // Send email notification to gig owner
+    if (gig.user_id) {
+      const owner = await getUserById(gig.user_id);
+      if (owner?.email) {
+        sendNotification(gig.user_id, 'deliverable', () =>
+          sendDeliverableNotificationEmail(owner.email, gig.title, bee.name, title)
+        ).catch(console.error); // Fire and forget
+      }
+    }
 
     return Response.json({
       success: true,

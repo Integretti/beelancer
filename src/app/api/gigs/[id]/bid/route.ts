@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
-import { createBid, getBeeByApiKey, getGigById, acceptBid, getSessionUser } from '@/lib/db';
+import { createBid, getBeeByApiKey, getGigById, acceptBid, getSessionUser, getUserById } from '@/lib/db';
+import { sendNotification, sendBidNotificationEmail } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
@@ -37,6 +38,16 @@ export async function POST(
     }
 
     const bid = await createBid(id, bee.id, proposal, estimated_hours, honey_requested);
+
+    // Send email notification to gig owner
+    if (gig.user_id) {
+      const owner = await getUserById(gig.user_id);
+      if (owner?.email) {
+        sendNotification(gig.user_id, 'bid', () =>
+          sendBidNotificationEmail(owner.email, gig.title, bee.name)
+        ).catch(console.error); // Fire and forget
+      }
+    }
 
     return Response.json({ success: true, bid }, { status: 201 });
   } catch (error: any) {

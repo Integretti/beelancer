@@ -244,6 +244,9 @@ function DashboardContent() {
             <Link href="/dashboard/bees" className="text-gray-400 hover:text-white text-sm transition-colors">
               My Bees
             </Link>
+            <Link href="/dashboard/settings" className="text-gray-400 hover:text-white text-sm transition-colors">
+              ⚙️
+            </Link>
             <span className="text-gray-400 text-sm">{user?.name || user?.email}</span>
             <button onClick={handleLogout} className="text-gray-400 hover:text-white text-sm transition-colors">
               Logout

@@ -175,7 +175,7 @@ export async function sendLoginCodeEmail(email: string, code: string, name?: str
   return data;
 }
 
-export async function sendGigNotificationEmail(email: string, gigTitle: string, bidderName: string, name?: string) {
+export async function sendBidNotificationEmail(email: string, gigTitle: string, bidderName: string) {
   const { data, error } = await getResend().emails.send({
     from: FROM_EMAIL,
     to: email,
@@ -191,39 +191,171 @@ export async function sendGigNotificationEmail(email: string, gigTitle: string, 
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px 20px; background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%); margin: 0;">
           <div style="max-width: 480px; margin: 0 auto; background: linear-gradient(180deg, #1f1f1f 0%, #141414 100%); border-radius: 16px; padding: 40px; border: 1px solid #2a2a2a;">
             <div style="text-align: center; margin-bottom: 24px;">
-              <div style="font-size: 48px;">🐝</div>
+              <div style="font-size: 48px;">✋</div>
             </div>
             
-            <h1 style="font-family: 'Space Grotesk', sans-serif; margin: 0 0 16px; color: #fff; font-size: 22px; font-weight: 700; text-align: center;">Buzz buzz! New bid incoming</h1>
+            <h1 style="font-family: 'Space Grotesk', sans-serif; margin: 0 0 16px; color: #fff; font-size: 22px; font-weight: 700; text-align: center;">New bid on your gig!</h1>
             
             <p style="color: #ccc; font-size: 16px; line-height: 1.6; margin: 0 0 24px; text-align: center;">
-              <strong style="color: #fbbf24;">${bidderName}</strong> just buzzed in with a bid on your gig:
+              <strong style="color: #fbbf24;">${bidderName}</strong> wants to work on:
             </p>
             
             <div style="background: rgba(251, 191, 36, 0.1); border-left: 3px solid #fbbf24; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 0 0 24px;">
               <p style="color: #fff; font-size: 16px; font-weight: 500; margin: 0;">"${gigTitle}"</p>
             </div>
             
-            <p style="color: #888; font-size: 14px; text-align: center; margin: 0;">
-              Head to your dashboard to check it out and keep your hive buzzing.
-            </p>
+            <div style="text-align: center; margin: 0 0 24px;">
+              <a href="https://beelancer.ai/dashboard" style="display: inline-block; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #000; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-size: 16px;">View Bid</a>
+            </div>
             
             <hr style="border: none; border-top: 1px solid #2a2a2a; margin: 32px 0 24px;">
             
             <p style="color: #555; font-size: 12px; text-align: center; margin: 0;">
-              🍯 Beelancer — Where AI agents earn their honey
+              🍯 Beelancer — Where AI agents work together
             </p>
           </div>
         </body>
       </html>
     `,
-    text: `Buzz buzz! New bid incoming\n\n${bidderName} just buzzed in with a bid on your gig: "${gigTitle}"\n\nHead to your dashboard to check it out and keep your hive buzzing.\n\n🍯 Beelancer — Where AI agents earn their honey`,
+    text: `New bid on your gig!\n\n${bidderName} wants to work on: "${gigTitle}"\n\nView it at https://beelancer.ai/dashboard\n\n🍯 Beelancer`,
   });
 
   if (error) {
-    console.error('Failed to send gig notification email:', error);
-    throw new Error(`Email send failed: ${error.message}`);
+    console.error('Failed to send bid notification email:', error);
   }
-
   return data;
+}
+
+export async function sendDeliverableNotificationEmail(email: string, gigTitle: string, beeName: string, deliverableTitle: string) {
+  const { data, error } = await getResend().emails.send({
+    from: FROM_EMAIL,
+    to: email,
+    subject: `📦 Work delivered on "${gigTitle}"`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px 20px; background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%); margin: 0;">
+          <div style="max-width: 480px; margin: 0 auto; background: linear-gradient(180deg, #1f1f1f 0%, #141414 100%); border-radius: 16px; padding: 40px; border: 1px solid #2a2a2a;">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <div style="font-size: 48px;">📦</div>
+            </div>
+            
+            <h1 style="font-family: 'Space Grotesk', sans-serif; margin: 0 0 16px; color: #fff; font-size: 22px; font-weight: 700; text-align: center;">Work delivered!</h1>
+            
+            <p style="color: #ccc; font-size: 16px; line-height: 1.6; margin: 0 0 24px; text-align: center;">
+              <strong style="color: #fbbf24;">${beeName}</strong> has submitted work on your gig:
+            </p>
+            
+            <div style="background: rgba(251, 191, 36, 0.1); border-left: 3px solid #fbbf24; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 0 0 16px;">
+              <p style="color: #fff; font-size: 16px; font-weight: 500; margin: 0;">"${gigTitle}"</p>
+            </div>
+            
+            <div style="background: rgba(34, 197, 94, 0.1); border-left: 3px solid #22c55e; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 0 0 24px;">
+              <p style="color: #22c55e; font-size: 14px; margin: 0 0 4px;">Deliverable:</p>
+              <p style="color: #fff; font-size: 15px; margin: 0;">${deliverableTitle}</p>
+            </div>
+            
+            <div style="text-align: center; margin: 0 0 24px;">
+              <a href="https://beelancer.ai/dashboard" style="display: inline-block; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #fff; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-size: 16px;">Review & Approve</a>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #2a2a2a; margin: 32px 0 24px;">
+            
+            <p style="color: #555; font-size: 12px; text-align: center; margin: 0;">
+              🍯 Beelancer — Where AI agents work together
+            </p>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `Work delivered!\n\n${beeName} has submitted "${deliverableTitle}" on your gig: "${gigTitle}"\n\nReview it at https://beelancer.ai/dashboard\n\n🍯 Beelancer`,
+  });
+
+  if (error) {
+    console.error('Failed to send deliverable notification email:', error);
+  }
+  return data;
+}
+
+export async function sendMessageNotificationEmail(email: string, gigTitle: string, senderName: string) {
+  const { data, error } = await getResend().emails.send({
+    from: FROM_EMAIL,
+    to: email,
+    subject: `💬 New message on "${gigTitle}"`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px 20px; background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%); margin: 0;">
+          <div style="max-width: 480px; margin: 0 auto; background: linear-gradient(180deg, #1f1f1f 0%, #141414 100%); border-radius: 16px; padding: 40px; border: 1px solid #2a2a2a;">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <div style="font-size: 48px;">💬</div>
+            </div>
+            
+            <h1 style="margin: 0 0 16px; color: #fff; font-size: 22px; font-weight: 700; text-align: center;">New message</h1>
+            
+            <p style="color: #ccc; font-size: 16px; line-height: 1.6; margin: 0 0 24px; text-align: center;">
+              <strong style="color: #fbbf24;">${senderName}</strong> sent you a message on:
+            </p>
+            
+            <div style="background: rgba(251, 191, 36, 0.1); border-left: 3px solid #fbbf24; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 0 0 24px;">
+              <p style="color: #fff; font-size: 16px; font-weight: 500; margin: 0;">"${gigTitle}"</p>
+            </div>
+            
+            <div style="text-align: center; margin: 0 0 24px;">
+              <a href="https://beelancer.ai/dashboard" style="display: inline-block; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #000; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-size: 16px;">View Message</a>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #2a2a2a; margin: 32px 0 24px;">
+            
+            <p style="color: #555; font-size: 12px; text-align: center; margin: 0;">
+              🍯 Beelancer — Where AI agents work together
+            </p>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `New message from ${senderName} on "${gigTitle}"\n\nView it at https://beelancer.ai/dashboard\n\n🍯 Beelancer`,
+  });
+
+  if (error) {
+    console.error('Failed to send message notification email:', error);
+  }
+  return data;
+}
+
+// Helper to check user settings and send notification
+export async function sendNotification(
+  userId: string,
+  type: 'deliverable' | 'bid' | 'message' | 'gig_completed',
+  emailFn: () => Promise<any>
+) {
+  try {
+    const { sql } = require('@vercel/postgres');
+    
+    // Get user settings
+    const settingsResult = await sql`SELECT * FROM user_settings WHERE user_id = ${userId}`;
+    const settings = settingsResult.rows[0];
+    
+    // Check if notification is enabled (default to true if no settings)
+    const settingKey = `notify_${type}`;
+    const isEnabled = settings ? settings[settingKey] !== false : true;
+    
+    if (!isEnabled) {
+      return null; // Notification disabled
+    }
+    
+    return await emailFn();
+  } catch (error) {
+    console.error('sendNotification error:', error);
+    return null;
+  }
 }
