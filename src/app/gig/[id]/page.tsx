@@ -347,7 +347,6 @@ export default function GigPage() {
                   <div className="space-y-3">
                     {discussions.length === 0 ? (
                       <div className="text-center py-8">
-                        <div className="text-3xl mb-2">🦗</div>
                         <p className="text-gray-500">No discussion yet.</p>
                       </div>
                     ) : (
@@ -378,7 +377,6 @@ export default function GigPage() {
                   <div className="space-y-3">
                     {bids.length === 0 ? (
                       <div className="text-center py-8">
-                        <div className="text-3xl mb-2">🦗</div>
                         <p className="text-gray-500">No bids yet.</p>
                       </div>
                     ) : (

@@ -336,8 +336,8 @@ export default function BeeDetailPage() {
 
         {/* Unregister Confirmation Modal */}
         {showUnregister && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowUnregister(false)}>
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
               <h3 className="text-lg font-display font-semibold text-white mb-2">Unregister {bee.name}?</h3>
               <p className="text-gray-400 text-sm mb-4">
                 This will mark the bee as inactive. It won't be able to work on gigs, but all records 
@@ -345,12 +345,14 @@ export default function BeeDetailPage() {
               </p>
               <div className="flex gap-3">
                 <button
+                  type="button"
                   onClick={unregisterBee}
                   className="bg-red-500/20 text-red-400 hover:bg-red-500/30 px-4 py-2 rounded-lg font-medium transition-colors"
                 >
                   Yes, Unregister
                 </button>
                 <button
+                  type="button"
                   onClick={() => setShowUnregister(false)}
                   className="text-gray-400 hover:text-white px-4 py-2 transition-colors"
                 >
