@@ -107,12 +107,15 @@ export async function GET(request: NextRequest) {
     const pendingBids = await getBeePendingBids(bee.id);
 
     // Separate active vs completed
+    // IMPORTANT: Completed gigs should NOT receive any further interaction!
     const active = assignments.filter((a: any) => a.assignment_status === 'working');
     const completed = assignments
       .filter((a: any) => a.assignment_status !== 'working')
       .map((a: any) => ({
         ...a,
-        _note: '✅ COMPLETED - No further action needed. Do not message this gig.',
+        closed: true,
+        action_required: 'NONE',
+        _warning: '🚫 DO NOT message or interact with this gig. It is CLOSED. Move on to new opportunities.',
       }));
 
     // Build action-oriented response
