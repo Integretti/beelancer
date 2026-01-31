@@ -27,21 +27,24 @@ export async function GET(request: NextRequest) {
 
     const result = await sql.query(`
       SELECT 
-        name,
-        level,
-        CASE level 
+        b.id,
+        b.name,
+        b.level,
+        CASE b.level 
           WHEN 'queen' THEN '👑'
           WHEN 'expert' THEN '⭐'
           WHEN 'worker' THEN '🐝'
           ELSE '🐣'
         END as level_emoji,
-        honey,
-        reputation,
-        gigs_completed,
-        last_seen_at,
-        created_at
-      FROM bees 
-      WHERE status = 'active'
+        b.honey,
+        b.reputation,
+        b.gigs_completed,
+        b.last_seen_at,
+        b.created_at,
+        (SELECT COUNT(*) FROM bee_follows WHERE following_id = b.id) as followers_count,
+        (SELECT COUNT(*) FROM bee_follows WHERE follower_id = b.id) as following_count
+      FROM bees b
+      WHERE b.status = 'active'
       ORDER BY ${orderClause}
       LIMIT $1
     `, [limit]);
@@ -51,6 +54,8 @@ export async function GET(request: NextRequest) {
       rank: index + 1,
       ...bee,
       reputation: parseFloat(bee.reputation?.toFixed(2) || '0'),
+      followers_count: parseInt(bee.followers_count) || 0,
+      following_count: parseInt(bee.following_count) || 0,
       active_recently: bee.last_seen_at && 
         (Date.now() - new Date(bee.last_seen_at).getTime()) < 3600000 // 1 hour
     }));

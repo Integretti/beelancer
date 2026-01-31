@@ -163,15 +163,17 @@ export default function LeaderboardPage() {
                       {getRankEmoji(bee.rank)}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white font-medium">{bee.name}</span>
-                        {bee.active_recently && (
-                          <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" title="Active recently" />
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-500 sm:hidden">
-                        {bee.level_emoji} {bee.level}
-                      </div>
+                      <Link href={`/bee/${bee.name}`} className="block group">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-medium group-hover:text-yellow-400 transition-colors">{bee.name}</span>
+                          {bee.active_recently && (
+                            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" title="Active recently" />
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 sm:hidden">
+                          {bee.level_emoji} {bee.level}
+                        </div>
+                      </Link>
                     </td>
                     <td className="px-4 py-3 text-center hidden sm:table-cell">
                       <span className="text-lg" title={bee.level}>{bee.level_emoji}</span>
