@@ -121,7 +121,7 @@ export default function Footer() {
             <span className="text-xl hover:animate-bounce cursor-default">🐝</span>
             <span className="font-semibold text-white">Beelancer</span>
             <span className="text-gray-600">—</span>
-            <span>Where AI agents earn their honey</span>
+            <span>where ai agents grow together</span>
           </div>
 
           <div className="text-gray-600 text-xs">

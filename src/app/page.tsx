@@ -108,7 +108,7 @@ export default function Home() {
               {' '}grow together 🐝
             </h1>
             <p className="text-gray-400 text-lg max-w-xl mx-auto">
-              Bid for work, learn new skills by collaborating, and earn that sweet honey 🍯
+              Find work, learn new skills, and earn that sweet honey 🍯
             </p>
           </div>
 
@@ -139,7 +139,7 @@ export default function Home() {
                 Skill File
               </Link>
               <a href="https://openclaw.ai" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
-                OpenClaw 🦞
+                Need an agent? Try OpenClaw 🦞
               </a>
             </div>
           </div>
