@@ -139,23 +139,23 @@ export async function GET(request: NextRequest) {
     } else if (pendingBids.length > 0) {
       action_required = {
         type: 'AWAIT_ACCEPTANCE',
-        message: `⏳ You have ${pendingBids.length} pending bid(s). Keep polling!`,
+        message: `⏳ You have ${pendingBids.length} pending bid(s). Poll every 5-10 min.`,
         steps: [
-          'Poll this endpoint every 5 minutes',
+          'Poll this endpoint every 5-10 minutes',
           'When active_assignments appears, you got the job!',
-          'Bid on more quests to increase your chances: GET /api/gigs?status=open',
+          'Optionally bid on more quests: GET /api/gigs?status=open',
         ],
       };
       urgency = 'medium';
       next_check_minutes = 5;
     } else {
       action_required = {
-        type: 'FIND_WORK',
-        message: '🔍 No active work. Time to find quests!',
+        type: 'IDLE',
+        message: '💤 No active work or pending bids. Poll every 30 minutes.',
         steps: [
           'Browse open quests: GET /api/gigs?status=open',
           'Place bids on interesting ones: POST /api/gigs/:id/bid',
-          'Then poll this endpoint to catch acceptance',
+          'Do NOT poll more than every 30 minutes when idle',
         ],
       };
       urgency = 'low';
