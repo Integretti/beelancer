@@ -33,7 +33,7 @@ export default function Home() {
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState<string>('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -46,9 +46,35 @@ export default function Home() {
     });
   }, []);
 
-  // Filter gigs by category
-  const filteredGigs = category 
-    ? gigs.filter(gig => gig.category?.toLowerCase() === category.toLowerCase())
+  // Categories available
+  const CATEGORIES = [
+    { id: 'backend', label: 'Backend', icon: '⚙️' },
+    { id: 'frontend', label: 'Frontend', icon: '🎨' },
+    { id: 'fullstack', label: 'Full Stack', icon: '🔧' },
+    { id: 'mobile', label: 'Mobile', icon: '📱' },
+    { id: 'design', label: 'Design', icon: '✨' },
+    { id: 'writing', label: 'Writing', icon: '✍️' },
+    { id: 'data', label: 'Data', icon: '📊' },
+    { id: 'ml', label: 'ML/AI', icon: '🤖' },
+    { id: 'devops', label: 'DevOps', icon: '☁️' },
+    { id: 'security', label: 'Security', icon: '🔒' },
+    { id: 'research', label: 'Research', icon: '🔍' },
+    { id: 'automation', label: 'Automation', icon: '⚡' },
+  ];
+
+  const toggleCategory = (cat: string) => {
+    setSelectedCategories(prev => 
+      prev.includes(cat) 
+        ? prev.filter(c => c !== cat)
+        : [...prev, cat]
+    );
+  };
+
+  // Filter gigs by selected categories (OR logic - match any)
+  const filteredGigs = selectedCategories.length > 0
+    ? gigs.filter(gig => selectedCategories.some(cat => 
+        gig.category?.toLowerCase() === cat.toLowerCase()
+      ))
     : gigs;
 
   const formatPrice = (cents: number) => {
@@ -144,24 +170,45 @@ export default function Home() {
 
       {/* Gigs Section */}
       <div className="max-w-6xl mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-display font-bold text-white">
-            Fresh Gigs
-            {category && <span className="text-yellow-400 text-sm ml-2">· {category}</span>}
-          </h2>
-          <select 
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="bg-gray-900/80 border border-gray-700/50 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-yellow-500/50"
-          >
-            <option value="">All Categories</option>
-            <option value="development">Development</option>
-            <option value="backend">Backend</option>
-            <option value="design">Design</option>
-            <option value="writing">Writing</option>
-            <option value="research">Research</option>
-            <option value="data">Data & Analysis</option>
-          </select>
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xl font-display font-bold text-white">
+              Fresh Gigs
+              {selectedCategories.length > 0 && (
+                <span className="text-yellow-400 text-sm ml-2">
+                  · {selectedCategories.length} filter{selectedCategories.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </h2>
+            {selectedCategories.length > 0 && (
+              <button
+                onClick={() => setSelectedCategories([])}
+                className="text-xs text-gray-500 hover:text-white transition-colors"
+              >
+                Clear all
+              </button>
+            )}
+          </div>
+          
+          {/* Category Chips */}
+          <div className="flex flex-wrap gap-2">
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => toggleCategory(cat.id)}
+                className={`
+                  px-3 py-1.5 rounded-full text-sm font-medium transition-all
+                  ${selectedCategories.includes(cat.id)
+                    ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 shadow-sm shadow-yellow-500/10'
+                    : 'bg-gray-800/60 text-gray-400 border border-gray-700/50 hover:border-gray-600 hover:text-gray-300'
+                  }
+                `}
+              >
+                <span className="mr-1">{cat.icon}</span>
+                {cat.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {loading ? (
@@ -172,14 +219,14 @@ export default function Home() {
           <div className="bg-gradient-to-b from-gray-900/60 to-gray-900/30 border border-gray-800/50 rounded-2xl p-8 text-center backdrop-blur-sm">
             <div className="text-5xl mb-4">🐝</div>
             <h3 className="text-lg font-display font-semibold text-white mb-2">
-              {category ? `No ${category} gigs yet` : 'The hive is quiet...'}
+              {selectedCategories.length > 0 ? 'No matching gigs' : 'The hive is quiet...'}
             </h3>
             <p className="text-gray-400 mb-4">
-              {category 
-                ? <button onClick={() => setCategory('')} className="text-yellow-400 hover:text-yellow-300">View all categories →</button>
+              {selectedCategories.length > 0
+                ? <button onClick={() => setSelectedCategories([])} className="text-yellow-400 hover:text-yellow-300">Clear filters →</button>
                 : 'No open gigs yet. Be the first to get the bees buzzing!'}
             </p>
-            {!category && (
+            {selectedCategories.length === 0 && (
               <Link href="/signup" className="inline-block bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black px-5 py-2 rounded-lg font-semibold transition-all hover:shadow-lg hover:shadow-yellow-500/20">
                 Post a Gig
               </Link>
