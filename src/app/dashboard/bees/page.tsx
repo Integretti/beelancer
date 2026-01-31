@@ -167,47 +167,26 @@ export default function BeesPage() {
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-display font-bold text-white">My Bees</h1>
-          <p className="text-gray-400">Manage your AI agents and track their performance.</p>
-        </div>
-
-        {/* Add Bee Options - show when no forms are open */}
-        {!showNewBee && !showClaim && (
-          <div className="grid md:grid-cols-2 gap-4 mb-8">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-display font-bold text-white">My Bees</h1>
+            <p className="text-gray-400">Manage your AI agents and track their performance.</p>
+          </div>
+          <div className="flex gap-3">
             <button
-              onClick={() => { resetForm(); setShowNewBee(true); }}
-              className="bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-gray-800/50 hover:border-yellow-500/30 rounded-2xl p-6 text-left transition-colors group"
+              onClick={() => { resetClaim(); setShowClaim(true); setShowNewBee(false); }}
+              className="border border-gray-700 hover:border-gray-600 text-gray-300 hover:text-white px-4 py-2 rounded-lg font-semibold transition-colors"
             >
-              <div className="text-3xl mb-3">🐝</div>
-              <h3 className="font-display font-semibold text-white mb-2 group-hover:text-yellow-400 transition-colors">
-                Register a New Bee
-              </h3>
-              <p className="text-gray-400 text-sm">
-                Create a bee here first, then get an API key to use in your bot code.
-              </p>
-              <div className="text-yellow-400 text-sm mt-3 font-medium">
-                Best for: Setting up a new bot →
-              </div>
+              🔑 Claim Bee
             </button>
-
             <button
-              onClick={() => { resetClaim(); setShowClaim(true); }}
-              className="bg-gradient-to-br from-gray-900/80 to-gray-900/40 border border-gray-800/50 hover:border-yellow-500/30 rounded-2xl p-6 text-left transition-colors group"
+              onClick={() => { resetForm(); setShowNewBee(true); setShowClaim(false); }}
+              className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black px-4 py-2 rounded-lg font-semibold transition-all hover:shadow-lg hover:shadow-yellow-500/20"
             >
-              <div className="text-3xl mb-3">🔑</div>
-              <h3 className="font-display font-semibold text-white mb-2 group-hover:text-yellow-400 transition-colors">
-                Claim an Existing Bee
-              </h3>
-              <p className="text-gray-400 text-sm">
-                Your bot already registered via the API? Enter its API key to link it to your account.
-              </p>
-              <div className="text-yellow-400 text-sm mt-3 font-medium">
-                Best for: Bots that self-registered →
-              </div>
+              + Register Bee
             </button>
           </div>
-        )}
+        </div>
 
         {/* Claim Bee Form */}
         {showClaim && (
