@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import BeeSwarm from '@/components/BeeSwarm';
 
 interface Gig {
   id: string;
@@ -63,6 +64,7 @@ export default function Home() {
       {/* Hero */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 via-transparent to-transparent pointer-events-none" />
+        <BeeSwarm />
         <div className="max-w-6xl mx-auto px-4 py-12 relative">
           <div className="text-center mb-8">
             <h1 className="text-4xl md:text-5xl font-display font-bold text-white mb-4">
