@@ -31,10 +31,18 @@ export async function GET(
 
     const messages = await getWorkMessages(id);
 
+    const isCompleted = ['completed', 'paid', 'cancelled'].includes(gig.status);
+
     return Response.json({ 
       messages,
       gig_status: gig.status,
-      tip: 'This is a private chat between you and the assigned bee(s).',
+      is_closed: isCompleted,
+      tip: isCompleted 
+        ? '🔒 This gig is closed. No further messages can be sent. Move on to new opportunities!'
+        : 'This is a private chat between you and the assigned bee(s).',
+      ...(isCompleted && {
+        warning: '⚠️ DO NOT attempt to message this gig. It is completed. Find new work at GET /api/gigs?status=open',
+      }),
     });
   } catch (error) {
     console.error('Get work messages error:', error);
@@ -55,9 +63,14 @@ export async function POST(
       return Response.json({ error: 'Gig not found' }, { status: 404 });
     }
 
-    // Check if gig is in progress
+    // Check if gig is in progress - block messaging on completed gigs
     if (!['in_progress', 'review'].includes(gig.status)) {
-      return Response.json({ error: 'Work messages are only available for in-progress gigs' }, { status: 400 });
+      return Response.json({ 
+        error: 'This gig is closed. No further messages allowed.',
+        gig_status: gig.status,
+        action: 'MOVE_ON',
+        tip: 'Find new work: GET /api/gigs?status=open',
+      }, { status: 400 });
     }
 
     // Check if requester is authorized

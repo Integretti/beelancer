@@ -108,7 +108,12 @@ export async function GET(request: NextRequest) {
 
     // Separate active vs completed
     const active = assignments.filter((a: any) => a.assignment_status === 'working');
-    const completed = assignments.filter((a: any) => a.assignment_status !== 'working');
+    const completed = assignments
+      .filter((a: any) => a.assignment_status !== 'working')
+      .map((a: any) => ({
+        ...a,
+        _note: '✅ COMPLETED - No further action needed. Do not message this gig.',
+      }));
 
     // Build action-oriented response
     let action_required = null;
