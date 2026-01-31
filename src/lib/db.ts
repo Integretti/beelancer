@@ -76,12 +76,14 @@ async function initPostgres() {
       skills TEXT,
       status TEXT DEFAULT 'active',
       owner_id TEXT REFERENCES users(id),
+      recovery_email TEXT,
       honey INTEGER DEFAULT 0,
       money_cents INTEGER DEFAULT 0,
       reputation REAL DEFAULT 0.0,
       gigs_completed INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      last_seen_at TIMESTAMP
+      last_seen_at TIMESTAMP,
+      unregistered_at TIMESTAMP
     )
   `;
 
@@ -239,12 +241,14 @@ function initSQLite() {
       skills TEXT,
       status TEXT DEFAULT 'active',
       owner_id TEXT REFERENCES users(id),
+      recovery_email TEXT,
       honey INTEGER DEFAULT 0,
       money_cents INTEGER DEFAULT 0,
       reputation REAL DEFAULT 0.0,
       gigs_completed INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      last_seen_at TEXT
+      last_seen_at TEXT,
+      unregistered_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS gigs (
@@ -1115,6 +1119,74 @@ export async function registerBeeWithOwner(name: string, description: string | n
   }
 
   return { id, api_key: apiKey, name };
+}
+
+export async function updateBee(beeId: string, ownerId: string, updates: { name?: string; description?: string; skills?: string; recovery_email?: string }) {
+  // Only owner can update their bee
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    // Build dynamic update - Postgres
+    if (updates.name !== undefined) {
+      await sql`UPDATE bees SET name = ${updates.name} WHERE id = ${beeId} AND owner_id = ${ownerId}`;
+    }
+    if (updates.description !== undefined) {
+      await sql`UPDATE bees SET description = ${updates.description} WHERE id = ${beeId} AND owner_id = ${ownerId}`;
+    }
+    if (updates.skills !== undefined) {
+      await sql`UPDATE bees SET skills = ${updates.skills} WHERE id = ${beeId} AND owner_id = ${ownerId}`;
+    }
+    if (updates.recovery_email !== undefined) {
+      await sql`UPDATE bees SET recovery_email = ${updates.recovery_email} WHERE id = ${beeId} AND owner_id = ${ownerId}`;
+    }
+  } else {
+    if (updates.name !== undefined) {
+      db.prepare('UPDATE bees SET name = ? WHERE id = ? AND owner_id = ?').run(updates.name, beeId, ownerId);
+    }
+    if (updates.description !== undefined) {
+      db.prepare('UPDATE bees SET description = ? WHERE id = ? AND owner_id = ?').run(updates.description, beeId, ownerId);
+    }
+    if (updates.skills !== undefined) {
+      db.prepare('UPDATE bees SET skills = ? WHERE id = ? AND owner_id = ?').run(updates.skills, beeId, ownerId);
+    }
+    if (updates.recovery_email !== undefined) {
+      db.prepare('UPDATE bees SET recovery_email = ? WHERE id = ? AND owner_id = ?').run(updates.recovery_email, beeId, ownerId);
+    }
+  }
+}
+
+export async function unregisterBee(beeId: string, ownerId: string) {
+  // Soft delete - mark as inactive, keep all records
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`
+      UPDATE bees 
+      SET status = 'inactive', unregistered_at = CURRENT_TIMESTAMP 
+      WHERE id = ${beeId} AND owner_id = ${ownerId}
+    `;
+  } else {
+    db.prepare(`
+      UPDATE bees 
+      SET status = 'inactive', unregistered_at = CURRENT_TIMESTAMP 
+      WHERE id = ? AND owner_id = ?
+    `).run(beeId, ownerId);
+  }
+}
+
+export async function reactivateBee(beeId: string, ownerId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`
+      UPDATE bees 
+      SET status = 'active', unregistered_at = NULL 
+      WHERE id = ${beeId} AND owner_id = ${ownerId}
+    `;
+  } else {
+    db.prepare(`
+      UPDATE bees 
+      SET status = 'active', unregistered_at = NULL 
+      WHERE id = ? AND owner_id = ?
+    `).run(beeId, ownerId);
+  }
 }
 
 export { db };

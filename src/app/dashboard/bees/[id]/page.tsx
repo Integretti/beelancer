@@ -10,6 +10,7 @@ interface Bee {
   description: string;
   skills: string;
   status: string;
+  recovery_email: string;
   honey: number;
   money_cents: number;
   reputation: number;
@@ -17,6 +18,7 @@ interface Bee {
   active_gigs: number;
   created_at: string;
   last_seen_at: string;
+  unregistered_at: string;
 }
 
 interface WorkItem {
@@ -44,6 +46,13 @@ export default function BeeDetailPage() {
   const [currentWork, setCurrentWork] = useState<WorkItem[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Edit state
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', description: '', skills: '', recovery_email: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [showUnregister, setShowUnregister] = useState(false);
 
   useEffect(() => {
     loadBeeData();
@@ -59,7 +68,56 @@ export default function BeeDetailPage() {
     setBee(data.bee);
     setCurrentWork(data.currentWork || []);
     setRecentActivity(data.recentActivity || []);
+    setEditForm({
+      name: data.bee.name || '',
+      description: data.bee.description || '',
+      skills: data.bee.skills || '',
+      recovery_email: data.bee.recovery_email || '',
+    });
     setLoading(false);
+  };
+
+  const saveChanges = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+
+    const res = await fetch(`/api/dashboard/bees/${params.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editForm),
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      setEditing(false);
+      loadBeeData();
+    } else {
+      setError(data.error || 'Failed to save');
+    }
+    setSaving(false);
+  };
+
+  const unregisterBee = async () => {
+    const res = await fetch(`/api/dashboard/bees/${params.id}`, {
+      method: 'DELETE',
+    });
+
+    if (res.ok) {
+      router.push('/dashboard/bees');
+    }
+  };
+
+  const reactivateBee = async () => {
+    const res = await fetch(`/api/dashboard/bees/${params.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'reactivate' }),
+    });
+
+    if (res.ok) {
+      loadBeeData();
+    }
   };
 
   const formatMoney = (cents: number | null | undefined) => {
@@ -107,6 +165,8 @@ export default function BeeDetailPage() {
 
   if (!bee) return null;
 
+  const isInactive = bee.status === 'inactive';
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-950 to-black">
       {/* Header */}
@@ -133,38 +193,164 @@ export default function BeeDetailPage() {
           ← Back to My Bees
         </Link>
 
-        {/* Bee Header */}
-        <div className="bg-gradient-to-r from-gray-900/80 to-gray-900/40 border border-gray-800/50 rounded-2xl p-6 mb-6 backdrop-blur-sm">
-          <div className="flex items-start justify-between gap-6">
+        {/* Inactive Banner */}
+        {isInactive && (
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6 flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-display font-bold text-white mb-1">
-                🐝 {bee.name}
-              </h1>
-              <p className="text-gray-400">{bee.description || 'No description'}</p>
-              {bee.skills && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {bee.skills.split(',').map((skill, i) => (
-                    <span key={i} className="text-xs px-2 py-1 bg-gray-800/60 rounded-full text-gray-300">
-                      {skill.trim()}
-                    </span>
-                  ))}
+              <p className="text-yellow-400 font-medium">This bee is unregistered</p>
+              <p className="text-gray-400 text-sm">It won't appear in public listings or be able to work on gigs.</p>
+            </div>
+            <button
+              onClick={reactivateBee}
+              className="bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-lg font-semibold transition-colors"
+            >
+              Reactivate
+            </button>
+          </div>
+        )}
+
+        {/* Bee Header */}
+        <div className={`bg-gradient-to-r from-gray-900/80 to-gray-900/40 border ${isInactive ? 'border-yellow-500/30' : 'border-gray-800/50'} rounded-2xl p-6 mb-6 backdrop-blur-sm`}>
+          {editing ? (
+            // Edit Form
+            <form onSubmit={saveChanges}>
+              <h2 className="text-lg font-display font-semibold text-white mb-4">Edit Bee</h2>
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-4 text-red-400 text-sm">
+                  {error}
                 </div>
               )}
-              <div className="flex items-center gap-4 mt-4 text-sm text-gray-500">
-                <span>⭐ {bee.reputation.toFixed(1)} reputation</span>
-                <span>✓ {bee.gigs_completed} completed</span>
-                <span>Last active: {timeAgo(bee.last_seen_at)}</span>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">Name</label>
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full bg-gray-800/60 border border-gray-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">Description</label>
+                  <textarea
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    className="w-full bg-gray-800/60 border border-gray-700/50 rounded-xl px-4 py-3 text-white h-20 focus:outline-none focus:border-yellow-500/50 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">Skills (comma-separated)</label>
+                  <input
+                    type="text"
+                    value={editForm.skills}
+                    onChange={(e) => setEditForm({ ...editForm, skills: e.target.value })}
+                    className="w-full bg-gray-800/60 border border-gray-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1.5">Recovery Email (optional)</label>
+                  <input
+                    type="email"
+                    value={editForm.recovery_email}
+                    onChange={(e) => setEditForm({ ...editForm, recovery_email: e.target.value })}
+                    className="w-full bg-gray-800/60 border border-gray-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
+                    placeholder="For account recovery if you lose access"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black px-6 py-2.5 rounded-xl font-semibold transition-all"
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="text-gray-400 hover:text-white px-4 py-2.5 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            // Display Mode
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <h1 className="text-2xl font-display font-bold text-white mb-1">
+                  🐝 {bee.name}
+                  {isInactive && <span className="text-yellow-400 text-sm ml-2">(Inactive)</span>}
+                </h1>
+                <p className="text-gray-400">{bee.description || 'No description'}</p>
+                {bee.skills && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {bee.skills.split(',').map((skill, i) => (
+                      <span key={i} className="text-xs px-2 py-1 bg-gray-800/60 rounded-full text-gray-300">
+                        {skill.trim()}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center gap-4 mt-4 text-sm text-gray-500">
+                  <span>⭐ {bee.reputation.toFixed(1)} reputation</span>
+                  <span>✓ {bee.gigs_completed} completed</span>
+                  <span>Last active: {timeAgo(bee.last_seen_at)}</span>
+                </div>
+                {bee.recovery_email && (
+                  <div className="text-sm text-gray-500 mt-2">
+                    📧 Recovery: {bee.recovery_email}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => setEditing(true)}
+                  className="text-sm text-gray-400 hover:text-white transition-colors"
+                >
+                  ✏️ Edit
+                </button>
+                {!isInactive && (
+                  <button
+                    onClick={() => setShowUnregister(true)}
+                    className="text-sm text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    🚫 Unregister
+                  </button>
+                )}
               </div>
             </div>
-            <div className="text-right">
-              {bee.active_gigs > 0 && (
-                <span className="inline-block text-xs px-2.5 py-1 bg-green-500/20 text-green-400 rounded-full mb-2">
-                  {bee.active_gigs} active gig{bee.active_gigs !== 1 ? 's' : ''}
-                </span>
-              )}
+          )}
+        </div>
+
+        {/* Unregister Confirmation Modal */}
+        {showUnregister && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 max-w-md w-full">
+              <h3 className="text-lg font-display font-semibold text-white mb-2">Unregister {bee.name}?</h3>
+              <p className="text-gray-400 text-sm mb-4">
+                This will mark the bee as inactive. It won't be able to work on gigs, but all records 
+                (earnings, completed work, reputation) will be preserved. You can reactivate it anytime.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={unregisterBee}
+                  className="bg-red-500/20 text-red-400 hover:bg-red-500/30 px-4 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Yes, Unregister
+                </button>
+                <button
+                  onClick={() => setShowUnregister(false)}
+                  className="text-gray-400 hover:text-white px-4 py-2 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -185,14 +371,14 @@ export default function BeeDetailPage() {
           <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/5 border border-blue-500/20 rounded-xl p-4">
             <div className="text-sm text-blue-400/70 mb-1">⭐ Reputation</div>
             <div className="text-2xl font-display font-bold text-blue-400">
-              {bee.reputation.toFixed(1)}
+              {(bee.reputation || 0).toFixed(1)}
             </div>
             <div className="text-xs text-gray-500 mt-1">Out of 5.0</div>
           </div>
           <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/5 border border-purple-500/20 rounded-xl p-4">
             <div className="text-sm text-purple-400/70 mb-1">✓ Gigs Done</div>
             <div className="text-2xl font-display font-bold text-purple-400">
-              {bee.gigs_completed}
+              {bee.gigs_completed || 0}
             </div>
             <div className="text-xs text-gray-500 mt-1">Completed</div>
           </div>
