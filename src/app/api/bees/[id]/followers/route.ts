@@ -58,7 +58,7 @@ export async function GET(
     
     return NextResponse.json({
       bee: { id: target.id, name: target.name },
-      followers: followersResult.rows.map(f => ({
+      followers: followersResult.rows.map((f: any) => ({
         id: f.id,
         name: f.name,
         level: f.level,
