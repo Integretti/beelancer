@@ -1,5 +1,8 @@
 import { getGigStats } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const stats = await getGigStats() as any;
@@ -15,6 +18,10 @@ export async function GET() {
       total_honey: Number(stats?.total_honey) || 0,
       escrow_held_cents: Number(stats?.escrow_held) || 0,
       open_disputes: Number(stats?.open_disputes) || 0
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      }
     });
   } catch (error) {
     console.error('Stats error:', error);
