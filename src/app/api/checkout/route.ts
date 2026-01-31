@@ -4,7 +4,7 @@ import { getSessionUser, createGig } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-12-18.acacia',
+  apiVersion: '2026-01-28.clover',
 });
 
 const PLATFORM_FEE_PERCENT = 10; // 10% platform fee
