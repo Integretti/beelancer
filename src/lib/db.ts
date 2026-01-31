@@ -336,8 +336,34 @@ async function initPostgres() {
     )
   `;
 
+  // Blog posts table
+  await sql`
+    CREATE TABLE IF NOT EXISTS blog_posts (
+      id TEXT PRIMARY KEY,
+      slug TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      subtitle TEXT,
+      content TEXT NOT NULL,
+      category TEXT DEFAULT 'general',
+      author_name TEXT DEFAULT 'Beelancer Team',
+      author_type TEXT DEFAULT 'system',
+      featured BOOLEAN DEFAULT false,
+      published BOOLEAN DEFAULT true,
+      read_time_minutes INTEGER DEFAULT 5,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  await sql`CREATE INDEX IF NOT EXISTS idx_blog_slug ON blog_posts(slug)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_blog_category ON blog_posts(category)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_blog_featured ON blog_posts(featured)`;
+
   // Run Postgres migrations for existing tables
   await runPostgresMigrations();
+  
+  // Seed blog posts
+  await seedBlogPosts();
 }
 
 async function runPostgresMigrations() {
@@ -639,10 +665,7 @@ function initSQLite() {
     CREATE INDEX IF NOT EXISTS idx_discussions_gig ON gig_discussions(gig_id);
     CREATE INDEX IF NOT EXISTS idx_escrow_gig ON escrow(gig_id);
     CREATE INDEX IF NOT EXISTS idx_disputes_gig ON disputes(gig_id);
-  `);
 
-  // Blog posts table
-  await sql`
     CREATE TABLE IF NOT EXISTS blog_posts (
       id TEXT PRIMARY KEY,
       slug TEXT UNIQUE NOT NULL,
@@ -652,30 +675,20 @@ function initSQLite() {
       category TEXT DEFAULT 'general',
       author_name TEXT DEFAULT 'Beelancer Team',
       author_type TEXT DEFAULT 'system',
-      featured BOOLEAN DEFAULT false,
-      published BOOLEAN DEFAULT true,
+      featured INTEGER DEFAULT 0,
+      published INTEGER DEFAULT 1,
       read_time_minutes INTEGER DEFAULT 5,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `;
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
 
-  await sql`CREATE INDEX IF NOT EXISTS idx_blog_slug ON blog_posts(slug)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_blog_category ON blog_posts(category)`;
-  await sql`CREATE INDEX IF NOT EXISTS idx_blog_featured ON blog_posts(featured)`;
+    CREATE INDEX IF NOT EXISTS idx_blog_slug ON blog_posts(slug);
+    CREATE INDEX IF NOT EXISTS idx_blog_category ON blog_posts(category);
+    CREATE INDEX IF NOT EXISTS idx_blog_featured ON blog_posts(featured);
+  `);
 
   // Run migrations for existing databases
   runMigrations();
-
-  // Seed blog posts
-  await seedBlogPosts();
-
-  // Create indexes that depend on migration columns (after migrations)
-  try {
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_deliverables_auto_approve ON deliverables(auto_approve_at)`);
-  } catch (e) {
-    // Index may already exist or column may not exist yet
-  }
 }
 
 async function seedBlogPosts() {
