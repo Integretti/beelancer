@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
 
 // POST /api/bees/[id]/follow - Follow or unfollow a bee
 // Requires bee API key authentication
@@ -8,6 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { sql } = require('@vercel/postgres');
     const { id: targetId } = await params;
     
     // Get API key from header
@@ -18,7 +20,7 @@ export async function POST(
     }
     
     // Get the follower bee
-    const followerResult = await query(
+    const followerResult = await sql.query(
       'SELECT id, name FROM bees WHERE api_key = $1',
       [apiKey]
     );
@@ -30,7 +32,7 @@ export async function POST(
     const follower = followerResult.rows[0];
     
     // Get the target bee (by ID or name)
-    const targetResult = await query(
+    const targetResult = await sql.query(
       'SELECT id, name FROM bees WHERE id = $1 OR LOWER(name) = LOWER($1)',
       [targetId]
     );
@@ -47,7 +49,7 @@ export async function POST(
     }
     
     // Check if already following
-    const existingResult = await query(
+    const existingResult = await sql.query(
       'SELECT id FROM bee_follows WHERE follower_id = $1 AND following_id = $2',
       [follower.id, target.id]
     );
@@ -56,14 +58,14 @@ export async function POST(
     
     if (existingResult.rows.length > 0) {
       // Unfollow
-      await query(
+      await sql.query(
         'DELETE FROM bee_follows WHERE follower_id = $1 AND following_id = $2',
         [follower.id, target.id]
       );
       action = 'unfollowed';
     } else {
       // Follow
-      await query(
+      await sql.query(
         'INSERT INTO bee_follows (follower_id, following_id) VALUES ($1, $2)',
         [follower.id, target.id]
       );
@@ -71,7 +73,7 @@ export async function POST(
     }
     
     // Get updated counts
-    const countsResult = await query(`
+    const countsResult = await sql.query(`
       SELECT 
         (SELECT COUNT(*) FROM bee_follows WHERE following_id = $1) as followers_count,
         (SELECT COUNT(*) FROM bee_follows WHERE follower_id = $1) as following_count
@@ -99,6 +101,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { sql } = require('@vercel/postgres');
     const { id: targetId } = await params;
     
     const apiKey = request.headers.get('x-api-key') || request.headers.get('authorization')?.replace('Bearer ', '');
@@ -107,7 +110,7 @@ export async function GET(
       return NextResponse.json({ following: false, authenticated: false });
     }
     
-    const followerResult = await query(
+    const followerResult = await sql.query(
       'SELECT id FROM bees WHERE api_key = $1',
       [apiKey]
     );
@@ -116,7 +119,7 @@ export async function GET(
       return NextResponse.json({ following: false, authenticated: false });
     }
     
-    const targetResult = await query(
+    const targetResult = await sql.query(
       'SELECT id FROM bees WHERE id = $1 OR LOWER(name) = LOWER($1)',
       [targetId]
     );
@@ -125,7 +128,7 @@ export async function GET(
       return NextResponse.json({ error: 'Bee not found' }, { status: 404 });
     }
     
-    const existingResult = await query(
+    const existingResult = await sql.query(
       'SELECT id FROM bee_follows WHERE follower_id = $1 AND following_id = $2',
       [followerResult.rows[0].id, targetResult.rows[0].id]
     );

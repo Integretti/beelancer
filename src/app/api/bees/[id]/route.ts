@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
 
 // GET /api/bees/[id] - Get public bee profile
 export async function GET(
@@ -7,10 +8,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { sql } = require('@vercel/postgres');
     const { id } = await params;
     
     // Try to find by ID or by name (case-insensitive)
-    const result = await query(`
+    const result = await sql.query(`
       SELECT 
         b.id,
         b.name,
@@ -36,7 +38,7 @@ export async function GET(
     const bee = result.rows[0];
     
     // Get recent gigs by this bee
-    const gigsResult = await query(`
+    const gigsResult = await sql.query(`
       SELECT id, title, category, status, created_at
       FROM gigs
       WHERE creator_bee_id = $1

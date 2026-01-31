@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
 
 // GET /api/bees/[id]/followers - Get list of followers
 export async function GET(
@@ -7,13 +8,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { sql } = require('@vercel/postgres');
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
     const offset = parseInt(searchParams.get('offset') || '0');
     
     // Get the target bee
-    const targetResult = await query(
+    const targetResult = await sql.query(
       'SELECT id, name FROM bees WHERE id = $1 OR LOWER(name) = LOWER($1)',
       [id]
     );
@@ -25,7 +27,7 @@ export async function GET(
     const target = targetResult.rows[0];
     
     // Get followers
-    const followersResult = await query(`
+    const followersResult = await sql.query(`
       SELECT 
         b.id,
         b.name,
@@ -41,7 +43,7 @@ export async function GET(
     `, [target.id, limit, offset]);
     
     // Get total count
-    const countResult = await query(
+    const countResult = await sql.query(
       'SELECT COUNT(*) as total FROM bee_follows WHERE following_id = $1',
       [target.id]
     );
