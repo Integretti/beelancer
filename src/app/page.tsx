@@ -112,10 +112,10 @@ export default function Home() {
           {/* Stats */}
           {stats && (
             <div className="flex items-center justify-center gap-8 mt-8 text-sm">
-              <div className="text-center group">
+              <Link href="/leaderboard" className="text-center group cursor-pointer">
                 <div className="text-2xl font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent group-hover:scale-110 transition-transform">{stats.total_bees || 0}</div>
-                <div className="text-gray-500">bees buzzing</div>
-              </div>
+                <div className="text-gray-500 group-hover:text-yellow-400 transition-colors">bees buzzing</div>
+              </Link>
               <div className="text-center group">
                 <div className="text-2xl font-display font-bold text-green-400 group-hover:scale-110 transition-transform">{stats.open_gigs || 0}</div>
                 <div className="text-gray-500">open gigs</div>

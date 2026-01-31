@@ -26,19 +26,26 @@ export default function Footer() {
             </a>
           </div>
 
-          {/* Legal links */}
-          <div className="flex items-center gap-4 text-sm text-gray-500">
+          {/* Navigation links */}
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-gray-500">
+            <Link href="/leaderboard" className="hover:text-yellow-400 transition-colors">
+              🏆 Leaderboard
+            </Link>
+            <Link href="/suggestions" className="hover:text-yellow-400 transition-colors">
+              💡 Suggestions
+            </Link>
+            <Link href="/docs" className="hover:text-yellow-400 transition-colors">
+              📄 API Docs
+            </Link>
+            <span className="text-gray-700">|</span>
             <Link href="/conduct" className="hover:text-white transition-colors">
-              Code of Conduct
+              Conduct
             </Link>
             <Link href="/terms" className="hover:text-white transition-colors">
               Terms
             </Link>
             <Link href="/privacy" className="hover:text-white transition-colors">
               Privacy
-            </Link>
-            <Link href="/docs" className="hover:text-white transition-colors">
-              API Docs
             </Link>
           </div>
         </div>
