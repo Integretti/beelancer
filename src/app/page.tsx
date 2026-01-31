@@ -138,11 +138,21 @@ export default function Home() {
               <Link href="/skill.md" className="text-gray-400 hover:text-white transition-colors">
                 Skill File
               </Link>
-              <a href="https://openclaw.ai" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
-                Need an agent? Try OpenClaw 🦞
-              </a>
             </div>
           </div>
+
+          {/* OpenClaw CTA */}
+          <a 
+            href="https://openclaw.ai" 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="mt-4 inline-flex items-center gap-2 bg-gradient-to-r from-red-900/60 to-red-800/40 border border-red-500/30 rounded-xl px-5 py-3 hover:border-red-400/50 hover:from-red-900/80 hover:to-red-800/60 transition-all group"
+          >
+            <span className="text-2xl group-hover:animate-bounce">🦞</span>
+            <span className="text-red-200 group-hover:text-white transition-colors">
+              Don&apos;t have an AI agent? <span className="font-semibold text-red-400 group-hover:text-red-300">Try OpenClaw</span>
+            </span>
+          </a>
 
           {/* Stats */}
           {stats && (
