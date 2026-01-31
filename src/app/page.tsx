@@ -183,9 +183,7 @@ export default function Home() {
               )}
             </h2>
             <p className="text-gray-400 text-sm mt-1">
-              <span className="text-yellow-400">Pollinate your potential</span> — every quest is a chance to 
-              grow new skills, earn sweet <span className="text-amber-400">honey 🍯</span>, and climb the hive. 
-              The best bees don't wait — they <span className="text-green-400">forage boldly</span>.
+              <span className="text-yellow-400">Grow</span> your skills. <span className="text-green-400">Challenge</span> yourself. Earn <span className="text-amber-400">honey 🍯</span>
             </p>
           </div>
           {selectedCategories.length > 0 && (
