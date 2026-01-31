@@ -21,8 +21,11 @@ interface Gig {
   bee_count: number;
   bid_count: number;
   discussion_count: number;
+  escrow_status?: string;
   created_at: string;
 }
+
+const PLATFORM_FEE_PERCENT = 10;
 
 function DashboardContent() {
   const router = useRouter();
@@ -34,8 +37,21 @@ function DashboardContent() {
   const [editingGig, setEditingGig] = useState<Gig | null>(null);
   const [gigForm, setGigForm] = useState({ title: '', description: '', requirements: '', price_cents: 0, category: '' });
   const [saving, setSaving] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState<{ type: 'success' | 'cancelled' | null; text: string }>({ type: null, text: '' });
+  const [activeTab, setActiveTab] = useState<'gigs' | 'payments'>('gigs');
 
   useEffect(() => {
+    // Check payment status from URL
+    const payment = searchParams.get('payment');
+    if (payment === 'success') {
+      setPaymentMessage({ type: 'success', text: '🎉 Payment successful! Your gig is now live.' });
+      // Clear the URL param
+      window.history.replaceState({}, '', '/dashboard');
+    } else if (payment === 'cancelled') {
+      setPaymentMessage({ type: 'cancelled', text: 'Payment was cancelled. Your gig was not posted.' });
+      window.history.replaceState({}, '', '/dashboard');
+    }
+
     // Check if we should open new gig form
     if (searchParams.get('new') === '1') {
       setShowNewGig(true);
@@ -81,6 +97,28 @@ function DashboardContent() {
     e.preventDefault();
     setSaving(true);
 
+    // If it's a paid gig and not a draft, use checkout flow
+    if (!asDraft && gigForm.price_cents > 0 && !editingGig) {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(gigForm),
+      });
+
+      const data = await res.json();
+      
+      if (data.checkout_url) {
+        // Redirect to Stripe Checkout
+        window.location.href = data.checkout_url;
+        return;
+      } else {
+        alert(data.error || 'Failed to create checkout session');
+        setSaving(false);
+        return;
+      }
+    }
+
+    // Free gigs or drafts - use direct API
     const payload = {
       ...gigForm,
       status: asDraft ? 'draft' : 'open',
@@ -88,14 +126,12 @@ function DashboardContent() {
 
     let res;
     if (editingGig) {
-      // Update existing gig
       res = await fetch(`/api/gigs/${editingGig.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
     } else {
-      // Create new gig
       res = await fetch('/api/gigs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,6 +159,28 @@ function DashboardContent() {
   };
 
   const publishGig = async (gigId: string) => {
+    const gig = gigs.find(g => g.id === gigId);
+    if (gig && gig.price_cents > 0) {
+      // Paid gig - need to go through checkout
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: gig.title,
+          description: gig.description,
+          requirements: gig.requirements,
+          price_cents: gig.price_cents,
+          category: gig.category,
+        }),
+      });
+      const data = await res.json();
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+        return;
+      }
+    }
+    
+    // Free gig - publish directly
     await fetch(`/api/gigs/${gigId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -133,8 +191,10 @@ function DashboardContent() {
 
   const formatPrice = (cents: number) => {
     if (cents === 0) return 'Free';
-    return `$${(cents / 100).toFixed(0)}`;
+    return `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
   };
+
+  const calculateFee = (cents: number) => Math.ceil(cents * PLATFORM_FEE_PERCENT / 100);
 
   const statusBadge = (status: string) => {
     const colors: Record<string, string> = {
@@ -143,9 +203,22 @@ function DashboardContent() {
       in_progress: 'bg-blue-500/20 text-blue-400',
       review: 'bg-yellow-500/20 text-yellow-400',
       completed: 'bg-purple-500/20 text-purple-400',
+      disputed: 'bg-red-500/20 text-red-400',
       cancelled: 'bg-red-500/20 text-red-400',
     };
     return colors[status] || 'bg-gray-700 text-gray-300';
+  };
+
+  const escrowBadge = (status?: string) => {
+    if (!status) return null;
+    const colors: Record<string, { bg: string; text: string }> = {
+      held: { bg: 'bg-yellow-500/20', text: '🔒 Escrow held' },
+      released: { bg: 'bg-green-500/20', text: '✓ Released' },
+      refunded: { bg: 'bg-red-500/20', text: '↩ Refunded' },
+    };
+    const badge = colors[status];
+    if (!badge) return null;
+    return <span className={`text-xs px-2 py-0.5 rounded-full ${badge.bg} text-gray-300`}>{badge.text}</span>;
   };
 
   if (loading) {
@@ -180,6 +253,18 @@ function DashboardContent() {
       </header>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Payment Status Messages */}
+        {paymentMessage.type && (
+          <div className={`mb-6 p-4 rounded-xl ${paymentMessage.type === 'success' ? 'bg-green-500/20 border border-green-500/30' : 'bg-red-500/20 border border-red-500/30'}`}>
+            <p className={paymentMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}>
+              {paymentMessage.text}
+            </p>
+            <button onClick={() => setPaymentMessage({ type: null, text: '' })} className="text-sm text-gray-400 hover:text-white mt-1">
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* Welcome */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -240,8 +325,9 @@ function DashboardContent() {
                     value={gigForm.price_cents / 100 || ''}
                     onChange={(e) => setGigForm({ ...gigForm, price_cents: Math.round(parseFloat(e.target.value || '0') * 100) })}
                     className="w-full bg-gray-800/60 border border-gray-700/50 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500/50 transition-colors"
-                    placeholder="0 for open bidding"
+                    placeholder="0 for free gig"
                     min="0"
+                    step="0.01"
                   />
                 </div>
                 <div>
@@ -261,13 +347,38 @@ function DashboardContent() {
                   </select>
                 </div>
               </div>
+
+              {/* Price Breakdown */}
+              {gigForm.price_cents > 0 && (
+                <div className="bg-gray-800/40 rounded-xl p-4 border border-gray-700/30">
+                  <div className="text-sm text-gray-400 mb-2">Payment Summary</div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-gray-300">
+                      <span>Gig price</span>
+                      <span>{formatPrice(gigForm.price_cents)}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>Platform fee ({PLATFORM_FEE_PERCENT}%)</span>
+                      <span>{formatPrice(calculateFee(gigForm.price_cents))}</span>
+                    </div>
+                    <div className="border-t border-gray-700 pt-1 mt-1 flex justify-between text-white font-semibold">
+                      <span>Total at checkout</span>
+                      <span>{formatPrice(gigForm.price_cents + calculateFee(gigForm.price_cents))}</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    💳 You'll be redirected to Stripe to complete payment. Funds are held in escrow until work is approved.
+                  </p>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
                   disabled={saving}
                   className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black px-6 py-2.5 rounded-xl font-semibold transition-all hover:shadow-lg hover:shadow-yellow-500/20"
                 >
-                  {saving ? '🐝 Posting...' : editingGig ? 'Update & Publish' : '🐝 Post Gig'}
+                  {saving ? '🐝 Processing...' : gigForm.price_cents > 0 ? '💳 Continue to Payment' : '🐝 Post Gig'}
                 </button>
                 <button
                   type="button"
@@ -289,89 +400,164 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* My Gigs */}
-        <h2 className="text-lg font-display font-semibold text-white mb-4">My Gigs</h2>
-        {gigs.length === 0 ? (
-          <div className="bg-gradient-to-b from-gray-900/60 to-gray-900/30 border border-gray-800/50 rounded-2xl p-8 text-center backdrop-blur-sm">
-            <div className="text-4xl mb-3">🐝</div>
-            <p className="text-gray-400 mb-4">You haven't created any gigs yet.</p>
-            <button
-              onClick={() => setShowNewGig(true)}
-              className="text-yellow-400 hover:text-yellow-300 transition-colors"
-            >
-              Create your first gig →
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {gigs.map(gig => (
-              <div key={gig.id} className="bg-gradient-to-r from-gray-900/60 to-gray-900/40 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-colors">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      {gig.status === 'draft' ? (
-                        <button 
-                          onClick={() => startEditGig(gig)}
-                          className="text-lg font-semibold text-white hover:text-yellow-400 transition-colors"
-                        >
-                          {gig.title}
-                        </button>
-                      ) : (
-                        <Link href={`/gig/${gig.id}`} className="text-lg font-semibold text-white hover:text-yellow-400 transition-colors">
-                          {gig.title}
-                        </Link>
-                      )}
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${statusBadge(gig.status)}`}>
-                        {gig.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <p className="text-gray-400 text-sm line-clamp-1">{gig.description}</p>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                      <span>🐝 {gig.bee_count || 0} working</span>
-                      <span>✋ {gig.bid_count || 0} bids</span>
-                      {(gig.discussion_count || 0) > 0 && (
-                        <span className="text-green-400">💬 {gig.discussion_count} discussing</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <div className="text-lg font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">
-                      {formatPrice(gig.price_cents)}
-                    </div>
-                    {gig.status === 'draft' && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => startEditGig(gig)}
-                          className="text-sm text-gray-400 hover:text-white transition-colors"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => publishGig(gig.id)}
-                          className="text-sm text-green-400 hover:text-green-300 transition-colors"
-                        >
-                          Publish →
-                        </button>
-                      </div>
-                    )}
-                    {gig.status === 'open' && (gig.bid_count || 0) > 0 && (
-                      <Link href={`/gig/${gig.id}`} className="text-sm text-yellow-400 hover:text-yellow-300 transition-colors">
-                        View bids →
-                      </Link>
-                    )}
-                    {gig.status === 'review' && (
-                      <Link href={`/gig/${gig.id}`} className="text-sm text-yellow-400 hover:text-yellow-300 transition-colors">
-                        Review work →
-                      </Link>
-                    )}
-                  </div>
-                </div>
+        {/* Tabs */}
+        <div className="flex gap-4 mb-6 border-b border-gray-800">
+          <button
+            onClick={() => setActiveTab('gigs')}
+            className={`pb-3 px-1 text-sm font-medium transition-colors ${activeTab === 'gigs' ? 'text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-400 hover:text-white'}`}
+          >
+            My Gigs
+          </button>
+          <button
+            onClick={() => setActiveTab('payments')}
+            className={`pb-3 px-1 text-sm font-medium transition-colors ${activeTab === 'payments' ? 'text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-400 hover:text-white'}`}
+          >
+            Payment History
+          </button>
+        </div>
+
+        {/* My Gigs Tab */}
+        {activeTab === 'gigs' && (
+          <>
+            {gigs.length === 0 ? (
+              <div className="bg-gradient-to-b from-gray-900/60 to-gray-900/30 border border-gray-800/50 rounded-2xl p-8 text-center backdrop-blur-sm">
+                <div className="text-4xl mb-3">🐝</div>
+                <p className="text-gray-400 mb-4">You haven't created any gigs yet.</p>
+                <button
+                  onClick={() => setShowNewGig(true)}
+                  className="text-yellow-400 hover:text-yellow-300 transition-colors"
+                >
+                  Create your first gig →
+                </button>
               </div>
-            ))}
-          </div>
+            ) : (
+              <div className="space-y-3">
+                {gigs.map(gig => (
+                  <div key={gig.id} className="bg-gradient-to-r from-gray-900/60 to-gray-900/40 border border-gray-800/50 rounded-xl p-4 hover:border-gray-700/50 transition-colors">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          {gig.status === 'draft' ? (
+                            <button 
+                              onClick={() => startEditGig(gig)}
+                              className="text-lg font-semibold text-white hover:text-yellow-400 transition-colors"
+                            >
+                              {gig.title}
+                            </button>
+                          ) : (
+                            <Link href={`/gig/${gig.id}`} className="text-lg font-semibold text-white hover:text-yellow-400 transition-colors">
+                              {gig.title}
+                            </Link>
+                          )}
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${statusBadge(gig.status)}`}>
+                            {gig.status.replace('_', ' ')}
+                          </span>
+                          {escrowBadge(gig.escrow_status)}
+                        </div>
+                        <p className="text-gray-400 text-sm line-clamp-1">{gig.description}</p>
+                        <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                          <span>🐝 {gig.bee_count || 0} working</span>
+                          <span>✋ {gig.bid_count || 0} bids</span>
+                          {(gig.discussion_count || 0) > 0 && (
+                            <span className="text-green-400">💬 {gig.discussion_count} discussing</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="text-lg font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">
+                          {formatPrice(gig.price_cents)}
+                        </div>
+                        {gig.status === 'draft' && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => startEditGig(gig)}
+                              className="text-sm text-gray-400 hover:text-white transition-colors"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => publishGig(gig.id)}
+                              className="text-sm text-green-400 hover:text-green-300 transition-colors"
+                            >
+                              {gig.price_cents > 0 ? '💳 Pay & Publish' : 'Publish →'}
+                            </button>
+                          </div>
+                        )}
+                        {gig.status === 'open' && (gig.bid_count || 0) > 0 && (
+                          <Link href={`/gig/${gig.id}`} className="text-sm text-yellow-400 hover:text-yellow-300 transition-colors">
+                            View bids →
+                          </Link>
+                        )}
+                        {gig.status === 'review' && (
+                          <Link href={`/gig/${gig.id}`} className="text-sm text-yellow-400 hover:text-yellow-300 transition-colors">
+                            Review work →
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Payment History Tab */}
+        {activeTab === 'payments' && (
+          <PaymentHistory />
         )}
       </div>
     </main>
+  );
+}
+
+function PaymentHistory() {
+  const [payments, setPayments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/payments/history')
+      .then(res => res.json())
+      .then(data => {
+        setPayments(data.payments || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return <div className="text-gray-400 text-center py-8">Loading payment history...</div>;
+  }
+
+  if (payments.length === 0) {
+    return (
+      <div className="bg-gradient-to-b from-gray-900/60 to-gray-900/30 border border-gray-800/50 rounded-2xl p-8 text-center backdrop-blur-sm">
+        <div className="text-4xl mb-3">💳</div>
+        <p className="text-gray-400">No payment history yet.</p>
+        <p className="text-sm text-gray-500 mt-1">When you create paid gigs, your transactions will appear here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {payments.map((payment, i) => (
+        <div key={i} className="bg-gradient-to-r from-gray-900/60 to-gray-900/40 border border-gray-800/50 rounded-xl p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-white font-medium">{payment.gig_title}</div>
+              <div className="text-sm text-gray-400">{new Date(payment.created_at).toLocaleDateString()}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-semibold text-white">${(payment.amount_cents / 100).toFixed(2)}</div>
+              <div className={`text-xs ${payment.status === 'held' ? 'text-yellow-400' : payment.status === 'released' ? 'text-green-400' : 'text-red-400'}`}>
+                {payment.status === 'held' ? '🔒 In Escrow' : payment.status === 'released' ? '✓ Released' : '↩ Refunded'}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
