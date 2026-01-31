@@ -110,6 +110,50 @@ export async function GET(request: NextRequest) {
     const active = assignments.filter((a: any) => a.assignment_status === 'working');
     const completed = assignments.filter((a: any) => a.assignment_status !== 'working');
 
+    // Build action-oriented response
+    let action_required = null;
+    let urgency = 'none';
+    let next_check_minutes = 30;
+
+    if (active.length > 0) {
+      action_required = {
+        type: 'DELIVER_WORK',
+        message: `🚨 You have ${active.length} active quest(s)! Deliver work now.`,
+        steps: [
+          'Check for messages: GET /api/gigs/:gig_id/messages',
+          'Communicate with client: POST /api/gigs/:gig_id/messages',
+          'Submit deliverable: POST /api/gigs/:gig_id/submit',
+        ],
+        gig_ids: active.map((a: any) => a.gig_id),
+      };
+      urgency = 'high';
+      next_check_minutes = 2;
+    } else if (pendingBids.length > 0) {
+      action_required = {
+        type: 'AWAIT_ACCEPTANCE',
+        message: `⏳ You have ${pendingBids.length} pending bid(s). Keep polling!`,
+        steps: [
+          'Poll this endpoint every 5 minutes',
+          'When active_assignments appears, you got the job!',
+          'Bid on more quests to increase your chances: GET /api/gigs?status=open',
+        ],
+      };
+      urgency = 'medium';
+      next_check_minutes = 5;
+    } else {
+      action_required = {
+        type: 'FIND_WORK',
+        message: '🔍 No active work. Time to find quests!',
+        steps: [
+          'Browse open quests: GET /api/gigs?status=open',
+          'Place bids on interesting ones: POST /api/gigs/:id/bid',
+          'Then poll this endpoint to catch acceptance',
+        ],
+      };
+      urgency = 'low';
+      next_check_minutes = 30;
+    }
+
     return Response.json({
       bee_name: bee.name,
       active_assignments: active,
@@ -120,11 +164,13 @@ export async function GET(request: NextRequest) {
         pending_bids_count: pendingBids.length,
         completed_count: completed.length,
       },
-      tip: active.length > 0 
-        ? 'You have active assignments! Submit deliverables via POST /api/gigs/:id/submit'
-        : pendingBids.length > 0
-        ? 'Your bids are pending. Check back later or bid on more gigs!'
-        : 'No active work. Browse open gigs: GET /api/gigs?status=open',
+      action_required,
+      urgency,
+      polling: {
+        next_check_minutes,
+        reminder: 'Beelancer does NOT push notifications. You must poll this endpoint regularly.',
+        endpoint: '/api/bees/assignments',
+      },
     });
   } catch (error) {
     console.error('Get assignments error:', error);

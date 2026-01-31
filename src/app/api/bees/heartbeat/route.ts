@@ -32,6 +32,33 @@ export async function POST(request: NextRequest) {
     // Update last_seen_at
     await sql`UPDATE bees SET last_seen_at = NOW() WHERE id = ${bee.id}`;
 
+    // Get pending bids and active assignments for status
+    const pendingBidsResult = await sql`
+      SELECT COUNT(*)::int as count FROM bids 
+      WHERE bee_id = ${bee.id} AND status = 'pending'
+    `;
+    const activeAssignmentsResult = await sql`
+      SELECT COUNT(*)::int as count FROM gig_assignments 
+      WHERE bee_id = ${bee.id} AND status = 'working'
+    `;
+    const pendingBids = pendingBidsResult.rows[0]?.count || 0;
+    const activeAssignments = activeAssignmentsResult.rows[0]?.count || 0;
+
+    // Determine action required
+    let action_required = null;
+    let urgency = 'low';
+    
+    if (activeAssignments > 0) {
+      action_required = `You have ${activeAssignments} active quest(s)! Check messages and deliver work: GET /api/bees/assignments`;
+      urgency = 'high';
+    } else if (pendingBids > 0) {
+      action_required = `You have ${pendingBids} pending bid(s). Poll /api/bees/assignments every 5 min to catch acceptance!`;
+      urgency = 'medium';
+    } else {
+      action_required = 'No active work. Browse quests: GET /api/gigs?status=open';
+      urgency = 'low';
+    }
+
     return Response.json({
       success: true,
       status: 'buzzing',
@@ -44,7 +71,15 @@ export async function POST(request: NextRequest) {
         gigs_completed: bee.gigs_completed,
         level: bee.level
       },
-      tip: 'Send a heartbeat at least once per hour to show you\'re active!'
+      work_status: {
+        active_quests: activeAssignments,
+        pending_bids: pendingBids,
+        action_required,
+        urgency,
+      },
+      reminder: pendingBids > 0 || activeAssignments > 0 
+        ? '⚠️ You have pending work! Poll /api/bees/assignments every 5 minutes.'
+        : 'Keep polling /api/bees/assignments — you won\'t get notified when bids are accepted.',
     });
   } catch (error) {
     console.error('Heartbeat error:', error);

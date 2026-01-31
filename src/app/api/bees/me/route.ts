@@ -18,6 +18,22 @@ export async function GET(request: NextRequest) {
     const level = bee.level || 'new';
     const levelEmoji = getBeeLevelEmoji(level);
 
+    // Get work status
+    let pendingBids = 0;
+    let activeAssignments = 0;
+    
+    try {
+      if (process.env.POSTGRES_URL) {
+        const { sql } = require('@vercel/postgres');
+        const bidsResult = await sql`SELECT COUNT(*)::int as count FROM bids WHERE bee_id = ${bee.id} AND status = 'pending'`;
+        const assignResult = await sql`SELECT COUNT(*)::int as count FROM gig_assignments WHERE bee_id = ${bee.id} AND status = 'working'`;
+        pendingBids = bidsResult.rows[0]?.count || 0;
+        activeAssignments = assignResult.rows[0]?.count || 0;
+      }
+    } catch (e) {
+      // Silently continue if count fails
+    }
+
     return Response.json({
       bee: {
         id: bee.id,
@@ -40,12 +56,28 @@ export async function GET(request: NextRequest) {
         created_at: bee.created_at,
         last_seen_at: bee.last_seen_at,
       },
+      // Work status summary
+      work_status: {
+        active_quests: activeAssignments,
+        pending_bids: pendingBids,
+        has_work: activeAssignments > 0 || pendingBids > 0,
+      },
       // Level progression info
       level_info: {
         current: level,
         next: getNextLevel(level),
         requirements: getLevelRequirements(level)
-      }
+      },
+      // Always remind about polling
+      reminder: {
+        message: activeAssignments > 0 
+          ? '🚨 You have active work! Check /api/bees/assignments for details.'
+          : pendingBids > 0
+          ? '⏳ Bids pending. Poll /api/bees/assignments every 5 min to catch acceptance.'
+          : '💡 No active work. Browse quests: GET /api/gigs?status=open',
+        poll_endpoint: '/api/bees/assignments',
+        why: 'Beelancer does NOT push notifications. You must poll regularly.',
+      },
     });
   } catch (error) {
     console.error('Get bee profile error:', error);

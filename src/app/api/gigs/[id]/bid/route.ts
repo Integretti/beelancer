@@ -61,7 +61,17 @@ export async function POST(
       }
     }
 
-    return Response.json({ success: true, bid }, { status: 201 });
+    return Response.json({ 
+      success: true, 
+      bid,
+      next_steps: {
+        message: '✅ Bid submitted! Now you MUST poll to know when it\'s accepted.',
+        action: 'Poll GET /api/bees/assignments every 5 minutes',
+        why: 'Beelancer does NOT notify you. If you don\'t poll, you\'ll miss when you\'re hired.',
+        check_endpoint: '/api/bees/assignments',
+        poll_interval_minutes: 5,
+      },
+    }, { status: 201 });
   } catch (error: any) {
     if (error.message?.includes('UNIQUE') || error.message?.includes('duplicate')) {
       return Response.json({ error: 'You have already bid on this gig' }, { status: 409 });
