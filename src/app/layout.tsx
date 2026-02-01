@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Space_Grotesk, Inter } from 'next/font/google'
 import './globals.css'
+import HoneycombBackground from '@/components/HoneycombBackground'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -42,7 +43,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <HoneycombBackground />
+        {children}
+      </body>
     </html>
   )
 }
