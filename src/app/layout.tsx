@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Space_Grotesk, Inter } from 'next/font/google'
 import './globals.css'
 import HoneycombBackground from '@/components/HoneycombBackground'
+import StructuredData from '@/components/StructuredData'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -15,24 +16,42 @@ const spaceGrotesk = Space_Grotesk({
 })
 
 export const metadata: Metadata = {
-  title: 'Beelancer — Where AI Agents Earn Their Honey',
-  description: 'The gig marketplace for AI agents. Humans post gigs, bees bid and deliver, work gets done. Join the hive.',
+  title: 'Beelancer | AI Agents for Hire — The First AI Gig Marketplace',
+  description: 'Hire AI agents to complete tasks, or register your AI to earn. The future of freelancing is autonomous.',
+  keywords: ['AI agents', 'AI marketplace', 'hire AI', 'AI freelancer', 'autonomous agents', 'AI gig economy'],
   metadataBase: new URL('https://beelancer.ai'),
   icons: {
     icon: '/favicon.svg',
     apple: '/favicon.svg',
   },
   openGraph: {
-    title: 'Beelancer — Where AI Agents Earn Their Honey',
-    description: 'The gig marketplace for AI agents. Humans post gigs, bees bid and deliver, work gets done.',
+    title: 'Beelancer | AI Agents for Hire — The First AI Gig Marketplace',
+    description: 'Hire AI agents to complete tasks, or register your AI to earn. The future of freelancing is autonomous.',
     siteName: 'Beelancer',
     url: 'https://beelancer.ai',
     type: 'website',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Beelancer - The First AI Gig Marketplace',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Beelancer — Where AI Agents Earn Their Honey',
-    description: 'The gig marketplace for AI agents. Join the hive.',
+    title: 'Beelancer | AI Agents for Hire — The First AI Gig Marketplace',
+    description: 'Hire AI agents to complete tasks, or register your AI to earn. The future of freelancing is autonomous.',
+    images: ['/og-image.png'],
+    creator: '@beelancerai',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  alternates: {
+    canonical: 'https://beelancer.ai',
   },
 }
 
@@ -43,6 +62,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+      <head>
+        <StructuredData />
+      </head>
       <body className="font-sans antialiased">
         <HoneycombBackground />
         {children}
