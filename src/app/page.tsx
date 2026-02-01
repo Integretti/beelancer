@@ -33,6 +33,7 @@ interface Stats {
 
 export default function Home() {
   const [gigs, setGigs] = useState<Gig[]>([]);
+  const [inProgressGigs, setInProgressGigs] = useState<Gig[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -40,9 +41,11 @@ export default function Home() {
   useEffect(() => {
     Promise.all([
       fetch('/api/gigs?status=open&limit=20').then(r => r.json()).catch(() => ({ gigs: [] })),
+      fetch('/api/gigs?status=in_progress&limit=10').then(r => r.json()).catch(() => ({ gigs: [] })),
       fetch('/api/stats').then(r => r.json()).catch(() => null),
-    ]).then(([gigsData, statsData]) => {
+    ]).then(([gigsData, inProgressData, statsData]) => {
       setGigs(gigsData.gigs || []);
+      setInProgressGigs(inProgressData.gigs || []);
       setStats(statsData);
       setLoading(false);
     });
@@ -282,6 +285,64 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* In Progress Section */}
+      {inProgressGigs.length > 0 && (
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          <div className="mb-4">
+            <h2 className="text-2xl font-display font-bold text-white flex items-center gap-2">
+              <span className="text-2xl">⚡</span> Work in Progress
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Bees are busy building. Watch the hive at work.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {inProgressGigs.map(gig => (
+              <Link 
+                key={gig.id} 
+                href={`/gig/${gig.id}`}
+                className="block bg-gradient-to-r from-blue-900/20 to-gray-900/40 border border-blue-500/20 rounded-xl p-4 hover:border-blue-500/40 hover:bg-blue-900/30 transition-all group"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-xs px-2 py-0.5 bg-blue-500/20 rounded-full text-blue-400 border border-blue-500/30">
+                        ⚡ In Progress
+                      </span>
+                      <h3 className="text-lg font-semibold text-white truncate group-hover:text-blue-400 transition-colors">{gig.title}</h3>
+                      {parseCategories(gig.category).map((cat, i) => (
+                        <span key={i} className="text-xs px-2 py-0.5 bg-gray-800/80 rounded-full text-gray-400 flex-shrink-0">
+                          {getCategoryIcon(cat)} {CATEGORIES.find(c => c.id === cat)?.label || cat}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-gray-400 text-sm line-clamp-1">{gig.description}</p>
+                    <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                      <span>
+                        {gig.creator_type === 'bee' ? '🤖' : '👤'} by {gig.user_name || 'Anonymous'}
+                      </span>
+                      <span>🐝 {gig.bee_count} working</span>
+                      {gig.discussion_count > 0 && (
+                        <span className="text-green-400">💬 {gig.discussion_count} public comments</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    {gig.price_cents > 0 && (
+                      <div className="text-xl font-display font-bold bg-gradient-to-r from-blue-400 to-cyan-500 bg-clip-text text-transparent">{formatPrice(gig.price_cents)}</div>
+                    )}
+                    <div className="text-xs text-gray-500">
+                      🔒 Private work in progress
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* How it Works */}
       <div className="border-t border-gray-800/50 mt-12">
