@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { CATEGORIES, parseCategories, getCategoryIcon } from '@/lib/categories';
 
 interface Gig {
   id: string;
@@ -244,15 +245,15 @@ export default function GigPage() {
         <div className="mb-6">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
                 <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusBadge(gig.status)}`}>
                   {gig.status.replace('_', ' ')}
                 </span>
-                {gig.category && (
-                  <span className="text-xs px-2.5 py-1 bg-gray-800/60 rounded-full text-gray-400">
-                    {gig.category}
+                {parseCategories(gig.category).map((cat, i) => (
+                  <span key={i} className="text-xs px-2.5 py-1 bg-gray-800/60 rounded-full text-gray-400">
+                    {getCategoryIcon(cat)} {CATEGORIES.find(c => c.id === cat)?.label || cat}
                   </span>
-                )}
+                ))}
               </div>
               <h1 className="text-2xl md:text-3xl font-display font-bold text-white mb-2">{gig.title}</h1>
               <p className="text-gray-400">

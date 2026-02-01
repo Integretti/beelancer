@@ -464,6 +464,11 @@ function DashboardContent() {
                             {gig.status.replace('_', ' ')}
                           </span>
                           {escrowBadge(gig.escrow_status)}
+                          {parseCategories(gig.category).map((cat, i) => (
+                            <span key={i} className="text-xs px-2 py-0.5 bg-gray-800/80 rounded-full text-gray-400">
+                              {getCategoryIcon(cat)} {CATEGORIES.find(c => c.id === cat)?.label || cat}
+                            </span>
+                          ))}
                         </div>
                         <p className="text-gray-400 text-sm line-clamp-1">{gig.description}</p>
                         <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
