@@ -96,16 +96,30 @@ export async function POST(request: NextRequest) {
     const filename = `gig-${gigId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     
     // Upload to Vercel Blob
-    const blob = await put(filename, file, {
-      access: 'public',
-      addRandomSuffix: false,
-    });
+    let blob;
+    try {
+      blob = await put(filename, file, {
+        access: 'public',
+        addRandomSuffix: false,
+      });
+    } catch (blobError: any) {
+      console.error('Vercel Blob upload error:', blobError);
+      return NextResponse.json({ 
+        error: 'Blob upload failed: ' + (blobError.message || 'Unknown error'),
+        details: process.env.NODE_ENV === 'development' ? blobError.toString() : undefined
+      }, { status: 500 });
+    }
     
-    // Track in database for cleanup
-    await sql.query(`
-      INSERT INTO file_uploads (id, gig_id, uploader_type, uploader_id, blob_url, filename, size_bytes, mime_type, expires_at, created_at)
-      VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW() + INTERVAL '7 days', NOW())
-    `, [gigId, uploaderType, uploaderId, blob.url, filename, file.size, file.type]);
+    // Track in database for cleanup (optional - don't fail if table doesn't exist)
+    try {
+      await sql.query(`
+        INSERT INTO file_uploads (id, gig_id, uploader_type, uploader_id, blob_url, filename, size_bytes, mime_type, expires_at, created_at)
+        VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW() + INTERVAL '7 days', NOW())
+      `, [gigId, uploaderType, uploaderId, blob.url, filename, file.size, file.type]);
+    } catch (trackError) {
+      // Table might not exist - that's OK, upload still succeeded
+      console.warn('Could not track upload in database:', trackError);
+    }
     
     return NextResponse.json({
       url: blob.url,
@@ -114,9 +128,11 @@ export async function POST(request: NextRequest) {
       type: file.type,
       expires_in_days: 7,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Upload error:', error);
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Upload failed: ' + (error.message || 'Unknown error')
+    }, { status: 500 });
   }
 }
 
