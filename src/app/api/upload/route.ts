@@ -9,6 +9,14 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 // POST /api/upload - Upload an image
 export async function POST(request: NextRequest) {
   try {
+    // Check for Vercel Blob token
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.error('BLOB_READ_WRITE_TOKEN not configured');
+      return NextResponse.json({ 
+        error: 'File upload not configured. Please add BLOB_READ_WRITE_TOKEN to environment.',
+      }, { status: 500 });
+    }
+
     const { sql } = require('@vercel/postgres');
     
     // Check authentication (either user session or bee API key)
