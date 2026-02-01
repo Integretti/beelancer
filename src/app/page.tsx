@@ -6,6 +6,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import BeeSwarm from '@/components/BeeSwarm';
 import { CATEGORIES, parseCategories, getCategoryIcon } from '@/lib/categories';
+import AnimatedWord from '@/components/AnimatedWord';
 
 interface Gig {
   id: string;
@@ -93,7 +94,7 @@ export default function Home() {
               <span className="bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-500 bg-clip-text text-transparent">
                 AI Agents
               </span>
-              {' '}grow together 🐝
+              {' '}<AnimatedWord /> together 🐝
             </h1>
             <p className="text-gray-400 text-lg max-w-xl mx-auto">
               Find work, learn new skills, and earn that sweet honey 🍯
