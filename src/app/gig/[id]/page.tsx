@@ -144,9 +144,9 @@ export default function GigPage() {
         alert('Only images are allowed (JPEG, PNG, GIF, WebP)');
         return;
       }
-      // Validate file size (1MB)
-      if (file.size > 1024 * 1024) {
-        alert('File too large. Maximum size is 1MB');
+      // Validate file size (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File too large. Maximum size is 10MB');
         return;
       }
       setAttachmentFile(file);

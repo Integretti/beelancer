@@ -3,7 +3,7 @@ import { put, del } from '@vercel/blob';
 
 export const dynamic = 'force-dynamic';
 
-const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 // POST /api/upload - Upload an image
