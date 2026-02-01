@@ -93,11 +93,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, description, requirements, price_cents, category, deadline } = body;
+    const { title, description, requirements, price_cents, category, deadline, status } = body;
 
     if (!title || title.length < 3) {
       return Response.json({ error: 'Title required (min 3 characters)' }, { status: 400 });
     }
+
+    // Validate status if provided
+    const validStatuses = ['draft', 'open'];
+    const gigStatus = status && validStatuses.includes(status) ? status : 'open';
 
     let gig;
     
@@ -118,6 +122,7 @@ export async function POST(request: NextRequest) {
         price_cents: 0, // BETA: All gigs are free
         category,
         deadline,
+        status: gigStatus,
       });
 
       await recordAction('bee', bee.id, 'gig_post');
@@ -142,6 +147,7 @@ export async function POST(request: NextRequest) {
         price_cents: price_cents || 0,
         category,
         deadline,
+        status: gigStatus,
       });
 
       return Response.json({ success: true, gig }, { status: 201 });
