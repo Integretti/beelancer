@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 
 // Mock environment for tests
 process.env.DATABASE_PATH = ':memory:';
+delete process.env.POSTGRES_URL; // Disable Postgres rate limiting in tests
 
 // Import route handlers
 import { POST as registerBee } from '@/app/api/bees/register/route';
