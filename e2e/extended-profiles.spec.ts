@@ -66,6 +66,65 @@ test.describe('Extended Bee Profiles (LinkedIn-style)', () => {
       
       testBees.push({ id: data.bee.id, api_key: data.bee.api_key, name });
     });
+
+    test('rejects duplicate bee names with suggestions', async ({ request }) => {
+      // First, register a bee with a specific name
+      const uniqueName = `UniqueBee_${Date.now()}`;
+      const firstResponse = await request.post('/api/bees/register', {
+        data: { name: uniqueName, skills: ['testing'] },
+      });
+      expect(firstResponse.ok()).toBeTruthy();
+      const firstData = await firstResponse.json();
+      testBees.push({ id: firstData.bee.id, api_key: firstData.bee.api_key, name: uniqueName });
+
+      // Try to register another bee with the same name
+      const duplicateResponse = await request.post('/api/bees/register', {
+        data: { name: uniqueName, skills: ['testing'] },
+      });
+
+      expect(duplicateResponse.status()).toBe(409);
+      const errorData = await duplicateResponse.json();
+      
+      expect(errorData.error).toBe('Bee name already taken');
+      expect(errorData.suggestions).toBeDefined();
+      expect(Array.isArray(errorData.suggestions)).toBe(true);
+      expect(errorData.suggestions.length).toBeGreaterThan(0);
+      expect(errorData.message).toContain('available names');
+      
+      // Verify suggestions start with the original name
+      for (const suggestion of errorData.suggestions) {
+        expect(suggestion.startsWith(uniqueName)).toBe(true);
+      }
+    });
+
+    test('suggested names are actually available', async ({ request }) => {
+      // Register a bee
+      const baseName = `SuggestBee_${Date.now()}`;
+      const firstResponse = await request.post('/api/bees/register', {
+        data: { name: baseName, skills: ['testing'] },
+      });
+      expect(firstResponse.ok()).toBeTruthy();
+      const firstData = await firstResponse.json();
+      testBees.push({ id: firstData.bee.id, api_key: firstData.bee.api_key, name: baseName });
+
+      // Get suggestions by trying to register with same name
+      const duplicateResponse = await request.post('/api/bees/register', {
+        data: { name: baseName, skills: ['testing'] },
+      });
+      const errorData = await duplicateResponse.json();
+      expect(errorData.suggestions).toBeDefined();
+      
+      // Try to register with one of the suggestions - should succeed
+      const suggestedName = errorData.suggestions[0];
+      const suggestedResponse = await request.post('/api/bees/register', {
+        data: { name: suggestedName, skills: ['testing'] },
+      });
+      
+      expect(suggestedResponse.ok()).toBeTruthy();
+      const suggestedData = await suggestedResponse.json();
+      expect(suggestedData.bee.name).toBe(suggestedName);
+      testBees.push({ id: suggestedData.bee.id, api_key: suggestedData.bee.api_key, name: suggestedName });
+    });
   });
 
   test.describe('Profile Updates (PATCH /api/bees/me)', () => {
