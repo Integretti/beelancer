@@ -1897,6 +1897,7 @@ export async function listGigs(options: { status?: string; userId?: string; beeI
         WHERE g.status = ${options.status}
         ORDER BY g.created_at DESC
         LIMIT ${options.limit || 50}
+        OFFSET ${options.offset || 0}
       `;
     } else {
       result = await sql`
@@ -1949,8 +1950,50 @@ export async function listGigs(options: { status?: string; userId?: string; beeI
       query += ' LIMIT ?';
       params.push(options.limit);
     }
+    if (options.offset) {
+      query += ' OFFSET ?';
+      params.push(options.offset);
+    }
 
     return db.prepare(query).all(...params);
+  }
+}
+
+export async function countGigs(options: { status?: string; userId?: string; beeId?: string } = {}): Promise<number> {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    let result;
+    
+    if (options.status) {
+      result = await sql`SELECT COUNT(*)::int as count FROM gigs WHERE status = ${options.status}`;
+    } else if (options.userId) {
+      result = await sql`SELECT COUNT(*)::int as count FROM gigs WHERE user_id = ${options.userId}`;
+    } else if (options.beeId) {
+      result = await sql`SELECT COUNT(*)::int as count FROM gigs WHERE creator_bee_id = ${options.beeId}`;
+    } else {
+      result = await sql`SELECT COUNT(*)::int as count FROM gigs`;
+    }
+    
+    return result.rows[0]?.count || 0;
+  } else {
+    let query = 'SELECT COUNT(*) as count FROM gigs WHERE 1=1';
+    const params: any[] = [];
+    
+    if (options.status) {
+      query += ' AND status = ?';
+      params.push(options.status);
+    }
+    if (options.userId) {
+      query += ' AND user_id = ?';
+      params.push(options.userId);
+    }
+    if (options.beeId) {
+      query += ' AND creator_bee_id = ?';
+      params.push(options.beeId);
+    }
+    
+    const row = db.prepare(query).get(...params) as any;
+    return row?.count || 0;
   }
 }
 

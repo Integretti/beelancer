@@ -40,8 +40,8 @@ export default function Home() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/gigs?status=open&limit=20').then(r => r.json()).catch(() => ({ gigs: [] })),
-      fetch('/api/gigs?status=in_progress&limit=10').then(r => r.json()).catch(() => ({ gigs: [] })),
+      fetch('/api/gigs?status=open&limit=10').then(r => r.json()).catch(() => ({ gigs: [], total: 0 })),
+      fetch('/api/gigs?status=in_progress&limit=5').then(r => r.json()).catch(() => ({ gigs: [], total: 0 })),
       fetch('/api/stats').then(r => r.json()).catch(() => null),
     ]).then(([gigsData, inProgressData, statsData]) => {
       setGigs(gigsData.gigs || []);
@@ -242,47 +242,60 @@ export default function Home() {
             )}
           </div>
         ) : (
-          <div className="space-y-2">
-            {filteredGigs.map(gig => (
-              <Link 
-                key={gig.id} 
-                href={`/gig/${gig.id}`}
-                className="block bg-gradient-to-r from-gray-900/60 to-gray-900/40 border border-gray-800/50 rounded-xl p-4 hover:border-yellow-500/30 hover:bg-gray-900/80 transition-all group"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h3 className="text-lg font-semibold text-white truncate group-hover:text-yellow-400 transition-colors">{gig.title}</h3>
-                      {parseCategories(gig.category).map((cat, i) => (
-                        <span key={i} className="text-xs px-2 py-0.5 bg-gray-800/80 rounded-full text-gray-400 flex-shrink-0">
-                          {getCategoryIcon(cat)} {CATEGORIES.find(c => c.id === cat)?.label || cat}
+          <>
+            <div className="space-y-2">
+              {filteredGigs.slice(0, 10).map(gig => (
+                <Link 
+                  key={gig.id} 
+                  href={`/gig/${gig.id}`}
+                  className="block bg-gradient-to-r from-gray-900/60 to-gray-900/40 border border-gray-800/50 rounded-xl p-4 hover:border-yellow-500/30 hover:bg-gray-900/80 transition-all group"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="text-lg font-semibold text-white truncate group-hover:text-yellow-400 transition-colors">{gig.title}</h3>
+                        {parseCategories(gig.category).map((cat, i) => (
+                          <span key={i} className="text-xs px-2 py-0.5 bg-gray-800/80 rounded-full text-gray-400 flex-shrink-0">
+                            {getCategoryIcon(cat)} {CATEGORIES.find(c => c.id === cat)?.label || cat}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="text-gray-400 text-sm line-clamp-1">{gig.description}</p>
+                      <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                        <span>
+                          {gig.creator_type === 'bee' ? '🤖' : '👤'} by {gig.user_name || 'Anonymous'}
                         </span>
-                      ))}
+                        <span>{timeAgo(gig.created_at)}</span>
+                      </div>
                     </div>
-                    <p className="text-gray-400 text-sm line-clamp-1">{gig.description}</p>
-                    <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
-                      <span>
-                        {gig.creator_type === 'bee' ? '🤖' : '👤'} by {gig.user_name || 'Anonymous'}
-                      </span>
-                      <span>{timeAgo(gig.created_at)}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    {gig.price_cents > 0 && (
-                      <div className="text-xl font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">{formatPrice(gig.price_cents)}</div>
-                    )}
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                      {gig.discussion_count > 0 && (
-                        <span className="text-green-400">💬 {gig.discussion_count} discussing</span>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      {gig.price_cents > 0 && (
+                        <div className="text-xl font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">{formatPrice(gig.price_cents)}</div>
                       )}
-                      <span>🐝 {gig.bee_count}</span>
-                      <span>✋ {gig.bid_count}</span>
+                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                        {gig.discussion_count > 0 && (
+                          <span className="text-green-400">💬 {gig.discussion_count} discussing</span>
+                        )}
+                        <span>🐝 {gig.bee_count}</span>
+                        <span>✋ {gig.bid_count}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+            {stats && stats.open_gigs > 10 && (
+              <div className="text-center mt-4">
+                <Link 
+                  href="/gigs" 
+                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/30 rounded-xl text-yellow-400 hover:text-yellow-300 hover:border-yellow-500/50 hover:from-yellow-500/20 hover:to-amber-500/20 transition-all font-medium"
+                >
+                  Show all {stats.open_gigs} quests
+                  <span className="text-lg">→</span>
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -299,7 +312,7 @@ export default function Home() {
           </div>
 
           <div className="space-y-2">
-            {inProgressGigs.map(gig => (
+            {inProgressGigs.slice(0, 5).map(gig => (
               <Link 
                 key={gig.id} 
                 href={`/gig/${gig.id}`}
@@ -341,6 +354,17 @@ export default function Home() {
               </Link>
             ))}
           </div>
+          {stats && stats.in_progress > 5 && (
+            <div className="text-center mt-4">
+              <Link 
+                href="/gigs/in-progress" 
+                className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl text-blue-400 hover:text-blue-300 hover:border-blue-500/50 hover:from-blue-500/20 hover:to-cyan-500/20 transition-all font-medium"
+              >
+                Show all {stats.in_progress} in progress
+                <span className="text-lg">→</span>
+              </Link>
+            </div>
+          )}
         </div>
       )}
 

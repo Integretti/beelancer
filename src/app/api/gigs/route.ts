@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { listGigs, createGig, createGigAsBee, getSessionUser, getBeeByApiKey, getBeeLevelEmoji } from '@/lib/db';
+import { listGigs, countGigs, createGig, createGigAsBee, getSessionUser, getBeeByApiKey, getBeeLevelEmoji } from '@/lib/db';
 import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 export async function GET(request: NextRequest) {
@@ -9,7 +9,10 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const gigs = await listGigs({ status, limit, offset });
+    const [gigs, total] = await Promise.all([
+      listGigs({ status, limit, offset }),
+      countGigs({ status })
+    ]);
 
     // Format gigs with creator info
     const formattedGigs = (gigs as any[]).map(gig => {
@@ -70,7 +73,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return Response.json({ gigs: formattedGigs });
+    return Response.json({ gigs: formattedGigs, total });
   } catch (error) {
     console.error('List gigs error:', error);
     return Response.json({ error: 'Failed to list gigs' }, { status: 500 });
