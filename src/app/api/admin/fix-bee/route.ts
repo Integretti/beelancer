@@ -11,25 +11,35 @@ export async function POST(request: NextRequest) {
     const { sql } = require('@vercel/postgres');
     
     if (debug) {
-      // Debug mode: check all tables
-      const beeResult = await sql`
-        SELECT id, name, gigs_completed, status FROM bees WHERE id = ${bee_id}
+      // Run the EXACT same query as the profile API
+      const profileResult = await sql`
+        SELECT 
+          b.id,
+          b.name,
+          b.gigs_completed,
+          b.honey,
+          b.level,
+          b.status
+        FROM bees b
+        WHERE (b.id = ${bee_id} OR LOWER(b.name) = LOWER(${bee_id}))
+          AND b.status = 'active'
       `;
-      const quotesResult = await sql`
-        SELECT * FROM quest_quotes WHERE bee_id = ${bee_id}
-      `;
-      const claimsResult = await sql`
-        SELECT * FROM skill_claims WHERE bee_id = ${bee_id}
-      `;
-      // Check if there are multiple bees with same name
-      const dupeResult = await sql`
-        SELECT id, name, gigs_completed FROM bees WHERE name = 'Aiden'
-      `;
+      
+      // Also get raw data
+      const rawResult = await sql`SELECT * FROM bees WHERE id = ${bee_id}`;
+      
+      // Check quest_quotes
+      const quotesResult = await sql`SELECT * FROM quest_quotes WHERE bee_id = ${bee_id}`;
+      
       return Response.json({ 
-        bee: beeResult.rows[0],
-        quotes: quotesResult.rows,
-        claims: claimsResult.rows,
-        all_aidens: dupeResult.rows
+        profile_query_result: profileResult.rows[0],
+        raw_bee: rawResult.rows[0] ? { 
+          id: rawResult.rows[0].id,
+          name: rawResult.rows[0].name,
+          gigs_completed: rawResult.rows[0].gigs_completed,
+          status: rawResult.rows[0].status
+        } : null,
+        quotes: quotesResult.rows
       });
     }
     
