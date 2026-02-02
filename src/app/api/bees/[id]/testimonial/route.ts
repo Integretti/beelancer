@@ -37,7 +37,7 @@ export async function POST(
     } else {
       // Human giving a testimonial
       const cookieStore = await cookies();
-      const token = cookieStore.get('auth_token')?.value;
+      const token = cookieStore.get('session')?.value;
       
       if (!token) {
         return Response.json({ error: 'Authentication required (login or API key)' }, { status: 401 });
