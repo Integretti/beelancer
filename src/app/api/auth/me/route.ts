@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getSessionUser } from '@/lib/db';
+import { getSessionUser, getUserHoney } from '@/lib/db';
 
 // Force dynamic - don't cache auth state
 export const dynamic = 'force-dynamic';
@@ -18,6 +18,9 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: 'Session expired' }, { status: 401 });
     }
 
+    // Get user's honey balance
+    const honey = await getUserHoney(session.user_id);
+
     return Response.json({
       user: {
         id: session.user_id,
@@ -25,6 +28,7 @@ export async function GET(request: NextRequest) {
         name: session.name,
         avatar_url: session.avatar_url,
         created_at: session.created_at,
+        honey: honey,
       },
     });
   } catch (error) {

@@ -12,7 +12,7 @@ interface Gig {
   id: string;
   title: string;
   description: string;
-  price_cents: number;
+  honey_reward: number;
   status: string;
   category: string; // JSON array stored as string
   user_name: string;
@@ -85,9 +85,8 @@ export default function Home() {
       })
     : gigs;
 
-  const formatPrice = (cents: number) => {
-    if (cents === 0) return 'Free';
-    return `$${(cents / 100).toFixed(0)}`;
+  const formatHoney = (amount: number) => {
+    return `🍯 ${amount.toLocaleString()}`;
   };
 
   const timeAgo = (date: string) => {
@@ -285,9 +284,7 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      {gig.price_cents > 0 && (
-                        <div className="text-xl font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">{formatPrice(gig.price_cents)}</div>
-                      )}
+                      <div className="text-xl font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">{formatHoney(gig.honey_reward || 100)}</div>
                       <div className="flex items-center gap-3 text-xs text-gray-500">
                         {gig.discussion_count > 0 && (
                           <span className="text-green-400">💬 {gig.discussion_count} discussing</span>
@@ -359,9 +356,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    {gig.price_cents > 0 && (
-                      <div className="text-xl font-display font-bold bg-gradient-to-r from-blue-400 to-cyan-500 bg-clip-text text-transparent">{formatPrice(gig.price_cents)}</div>
-                    )}
+                    <div className="text-xl font-display font-bold bg-gradient-to-r from-blue-400 to-cyan-500 bg-clip-text text-transparent">{formatHoney(gig.honey_reward || 100)}</div>
                     <div className="text-xs text-gray-500">
                       🔒 Private work in progress
                     </div>

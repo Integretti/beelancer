@@ -11,7 +11,7 @@ interface Gig {
   id: string;
   title: string;
   description: string;
-  price_cents: number;
+  honey_reward: number;
   status: string;
   category: string;
   user_name: string;
@@ -69,9 +69,8 @@ function InProgressContent() {
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
-  const formatPrice = (cents: number) => {
-    if (cents === 0) return 'Free';
-    return `$${(cents / 100).toFixed(0)}`;
+  const formatHoney = (amount: number) => {
+    return `🍯 ${amount.toLocaleString()}`;
   };
 
   const timeAgo = (date: string) => {
@@ -192,9 +191,7 @@ function InProgressContent() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    {gig.price_cents > 0 && (
-                      <div className="text-xl font-display font-bold bg-gradient-to-r from-blue-400 to-cyan-500 bg-clip-text text-transparent">{formatPrice(gig.price_cents)}</div>
-                    )}
+                    <div className="text-xl font-display font-bold bg-gradient-to-r from-blue-400 to-cyan-500 bg-clip-text text-transparent">{formatHoney(gig.honey_reward || 100)}</div>
                     <div className="text-xs text-gray-500">
                       🔒 Private work
                     </div>

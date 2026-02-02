@@ -10,7 +10,7 @@ interface Gig {
   title: string;
   description: string;
   requirements: string;
-  price_cents: number;
+  honey_reward: number;
   status: string;
   category: string;
   user_id: string;
@@ -229,9 +229,8 @@ export default function GigPage() {
     window.location.reload();
   };
 
-  const formatPrice = (cents: number) => {
-    if (cents === 0) return 'Open Budget';
-    return `$${(cents / 100).toFixed(0)}`;
+  const formatHoney = (amount: number) => {
+    return `🍯 ${amount.toLocaleString()}`;
   };
 
   const timeAgo = (date: string) => {
@@ -326,7 +325,7 @@ export default function GigPage() {
             </div>
             <div className="text-right flex-shrink-0">
               <div className="text-2xl md:text-3xl font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">
-                {formatPrice(gig.price_cents)}
+                {formatHoney(gig.honey_reward || 100)}
               </div>
               <div className="text-sm text-gray-500 mt-1">
                 🐝 {gig.bee_count} · ✋ {bids.length} · 💬 {discussions.length}

@@ -8,6 +8,7 @@ interface User {
   id: string;
   name: string;
   email: string;
+  honey?: number;
 }
 
 export default function Header() {
@@ -91,15 +92,21 @@ export default function Header() {
           </Link>
           {checked && user ? (
             <>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/10 rounded-full border border-yellow-500/20">
+                <span className="text-lg">🍯</span>
+                <span className="text-yellow-400 font-semibold text-sm">{(user.honey || 0).toLocaleString()}</span>
+              </div>
               <Link href="/dashboard" className="text-gray-400 hover:text-white text-sm transition-colors">
                 Dashboard
               </Link>
-              <Link 
-                href="/dashboard?new=1" 
-                className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:shadow-lg hover:shadow-yellow-500/20"
-              >
-                Post a Gig
-              </Link>
+              {pathname !== '/dashboard' && (
+                <Link 
+                  href="/dashboard?new=1" 
+                  className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:shadow-lg hover:shadow-yellow-500/20"
+                >
+                  Post a Gig
+                </Link>
+              )}
             </>
           ) : checked ? (
             <>
@@ -156,6 +163,10 @@ export default function Header() {
             </Link>
             {checked && user ? (
               <>
+                <div className="flex items-center gap-2 py-2">
+                  <span className="text-lg">🍯</span>
+                  <span className="text-yellow-400 font-semibold">{(user.honey || 0).toLocaleString()} Honey</span>
+                </div>
                 <Link 
                   href="/dashboard" 
                   className="text-gray-400 hover:text-white transition-colors"
@@ -170,13 +181,15 @@ export default function Header() {
                 >
                   My Bees
                 </Link>
-                <Link 
-                  href="/dashboard?new=1" 
-                  className="bg-gradient-to-r from-yellow-500 to-amber-500 text-black px-4 py-2 rounded-lg text-sm font-semibold text-center"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  Post a Gig
-                </Link>
+                {pathname !== '/dashboard' && (
+                  <Link 
+                    href="/dashboard?new=1" 
+                    className="bg-gradient-to-r from-yellow-500 to-amber-500 text-black px-4 py-2 rounded-lg text-sm font-semibold text-center"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Post a Gig
+                  </Link>
+                )}
               </>
             ) : checked ? (
               <>

@@ -497,9 +497,12 @@ async function runPostgresMigrations() {
     console.log('Note: user honey migration:', e.message?.slice(0, 100));
   }
 
-  // Migrate existing gigs: set honey_reward from price_cents if not set (1 cent = 1 honey)
+  // Migrate existing gigs: set honey_reward from price_cents or random 100-1000 if free
   try {
-    await sql`UPDATE gigs SET honey_reward = GREATEST(price_cents, 100) WHERE honey_reward IS NULL OR honey_reward = 0`;
+    // For paid gigs, use the price_cents value
+    await sql`UPDATE gigs SET honey_reward = GREATEST(price_cents, 100) WHERE (honey_reward IS NULL OR honey_reward = 0) AND price_cents > 0`;
+    // For free gigs, assign random honey between 100-1000 in multiples of 100
+    await sql`UPDATE gigs SET honey_reward = (FLOOR(RANDOM() * 10) + 1) * 100 WHERE honey_reward IS NULL OR honey_reward = 0`;
   } catch (e: any) {
     console.log('Note: gig honey migration:', e.message?.slice(0, 100));
   }
