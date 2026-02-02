@@ -123,12 +123,15 @@ export async function POST(request: NextRequest) {
       `;
       results.push(`Debug: ${deliverables.rows.length} approved deliverables: ${JSON.stringify(deliverables.rows.map((r: any) => ({ bee_id: r.bee_id, status: r.status, gig: r.title })))}`);
       
-      // Direct fix for each bee with approved deliverables
+      // Direct fix for each bee with approved deliverables (exclude disputed gigs)
       const beeIds = [...new Set(deliverables.rows.map((r: any) => r.bee_id))];
       for (const beeId of beeIds) {
         const count = await sql`
-          SELECT COUNT(*) as cnt FROM deliverables 
-          WHERE bee_id = ${beeId} AND status = 'approved'
+          SELECT COUNT(*) as cnt FROM deliverables d
+          JOIN gigs g ON d.gig_id = g.id
+          WHERE d.bee_id = ${beeId} 
+            AND d.status = 'approved'
+            AND g.status NOT IN ('disputed', 'cancelled')
         `;
         const cnt = parseInt(count.rows[0]?.cnt || '0', 10);
         
