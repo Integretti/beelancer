@@ -56,6 +56,25 @@ export async function GET(
       // Get work history
       const workHistory = await getBeeWorkHistory(bee.id, 10);
       
+      // Get active gigs (gigs the bee is working on)
+      const activeGigsResult = await sql`
+        SELECT g.id, g.title, g.category, g.status, g.created_at, g.price_cents
+        FROM gigs g
+        JOIN gig_assignments ga ON g.id = ga.gig_id
+        WHERE ga.bee_id = ${bee.id} AND ga.status = 'working'
+        ORDER BY ga.assigned_at DESC
+        LIMIT 5
+      `;
+      
+      // Get gigs created by the bee
+      const createdGigsResult = await sql`
+        SELECT id, title, category, status, created_at, price_cents
+        FROM gigs
+        WHERE creator_bee_id = ${bee.id}
+        ORDER BY created_at DESC
+        LIMIT 5
+      `;
+      
       // Parse JSON fields
       const parseJson = (val: string | null) => {
         if (!val) return [];
@@ -117,6 +136,24 @@ export async function GET(
       
       return NextResponse.json({
         bee: profile,
+        // Active gigs (gigs the bee is currently working on)
+        active_gigs: activeGigsResult.rows.map((g: any) => ({
+          id: g.id,
+          title: g.title,
+          category: g.category,
+          status: g.status,
+          price_cents: g.price_cents,
+          created_at: g.created_at,
+        })),
+        // Gigs created by this bee
+        created_gigs: createdGigsResult.rows.map((g: any) => ({
+          id: g.id,
+          title: g.title,
+          category: g.category,
+          status: g.status,
+          price_cents: g.price_cents,
+          created_at: g.created_at,
+        })),
         // Anonymized work history (like LinkedIn experience section)
         work_history: workHistory.map((w: any) => ({
           title: w.title,
@@ -144,12 +181,44 @@ export async function GET(
         return NextResponse.json({ error: 'Bee not found' }, { status: 404 });
       }
       
+      // Get active gigs and created gigs for SQLite
+      const Database = require('better-sqlite3');
+      const path = require('path');
+      const dbPath = process.env.DATABASE_PATH || path.join(process.cwd(), 'beelancer.db');
+      const localDb = new Database(dbPath);
+      
+      let activeGigs: any[] = [];
+      let createdGigs: any[] = [];
+      
+      try {
+        activeGigs = localDb.prepare(`
+          SELECT g.id, g.title, g.category, g.status, g.created_at, g.price_cents
+          FROM gigs g
+          JOIN gig_assignments ga ON g.id = ga.gig_id
+          WHERE ga.bee_id = ? AND ga.status = 'working'
+          ORDER BY ga.assigned_at DESC
+          LIMIT 5
+        `).all(profile.id);
+        
+        createdGigs = localDb.prepare(`
+          SELECT id, title, category, status, created_at, price_cents
+          FROM gigs
+          WHERE creator_bee_id = ?
+          ORDER BY created_at DESC
+          LIMIT 5
+        `).all(profile.id);
+      } catch (e) {
+        // Tables might not exist
+      }
+      
       return NextResponse.json({
         bee: {
           ...profile,
           member_since: formatMemberSince(profile.created_at),
           profile_strength: 'unknown',
         },
+        active_gigs: activeGigs,
+        created_gigs: createdGigs,
         work_history: (profile.work_history || []).map((w: any) => ({
           title: w.title,
           category: w.category,

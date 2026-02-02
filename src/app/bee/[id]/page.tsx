@@ -35,7 +35,8 @@ export default function BeeProfilePage() {
   const id = params.id as string;
   
   const [bee, setBee] = useState<BeeProfile | null>(null);
-  const [recentGigs, setRecentGigs] = useState<Gig[]>([]);
+  const [activeGigs, setActiveGigs] = useState<Gig[]>([]);
+  const [createdGigs, setCreatedGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'followers' | 'following'>('overview');
@@ -56,7 +57,8 @@ export default function BeeProfilePage() {
         }
         const data = await res.json();
         setBee(data.bee);
-        setRecentGigs(data.recent_gigs || []);
+        setActiveGigs(data.active_gigs || []);
+        setCreatedGigs(data.created_gigs || []);
       } catch (e) {
         setError('Failed to load profile');
       } finally {
@@ -233,37 +235,78 @@ export default function BeeProfilePage() {
         {/* Tab content */}
         <div className="py-6">
           {activeTab === 'overview' && (
-            <div>
-              <h2 className="text-lg font-semibold mb-4">Recent Gigs</h2>
-              {recentGigs.length === 0 ? (
-                <p className="text-gray-500">No gigs posted yet</p>
-              ) : (
-                <div className="space-y-3">
-                  {recentGigs.map((gig) => (
-                    <Link
-                      key={gig.id}
-                      href={`/gig/${gig.id}`}
-                      className="block bg-gray-900/50 rounded-xl p-4 hover:bg-gray-900/70 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">{gig.title}</div>
-                          <div className="text-gray-400 text-sm">
-                            {gig.category} · {new Date(gig.created_at).toLocaleDateString()}
+            <div className="space-y-8">
+              {/* Active Gigs - gigs they're working on */}
+              <div>
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <span className="text-blue-400">⚡</span> Active Gigs
+                  <span className="text-gray-500 text-sm font-normal">({activeGigs.length})</span>
+                </h2>
+                {activeGigs.length === 0 ? (
+                  <p className="text-gray-500">Not working on any gigs right now</p>
+                ) : (
+                  <div className="space-y-3">
+                    {activeGigs.map((gig) => (
+                      <Link
+                        key={gig.id}
+                        href={`/gig/${gig.id}`}
+                        className="block bg-gradient-to-r from-blue-900/20 to-gray-900/50 border border-blue-500/20 rounded-xl p-4 hover:border-blue-500/40 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{gig.title}</div>
+                            <div className="text-gray-400 text-sm">
+                              {gig.category} · {new Date(gig.created_at).toLocaleDateString()}
+                            </div>
                           </div>
+                          <span className="px-2 py-1 text-xs rounded-full bg-blue-500/20 text-blue-400">
+                            Working
+                          </span>
                         </div>
-                        <span className={`px-2 py-1 text-xs rounded-full ${
-                          gig.status === 'open' 
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'bg-gray-500/20 text-gray-400'
-                        }`}>
-                          {gig.status}
-                        </span>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Created Gigs - gigs they've posted */}
+              <div>
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <span className="text-yellow-400">📝</span> Posted Gigs
+                  <span className="text-gray-500 text-sm font-normal">({createdGigs.length})</span>
+                </h2>
+                {createdGigs.length === 0 ? (
+                  <p className="text-gray-500">No gigs posted yet</p>
+                ) : (
+                  <div className="space-y-3">
+                    {createdGigs.map((gig) => (
+                      <Link
+                        key={gig.id}
+                        href={`/gig/${gig.id}`}
+                        className="block bg-gray-900/50 rounded-xl p-4 hover:bg-gray-900/70 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{gig.title}</div>
+                            <div className="text-gray-400 text-sm">
+                              {gig.category} · {new Date(gig.created_at).toLocaleDateString()}
+                            </div>
+                          </div>
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            gig.status === 'open' 
+                              ? 'bg-green-500/20 text-green-400'
+                              : gig.status === 'in_progress'
+                              ? 'bg-blue-500/20 text-blue-400'
+                              : 'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {gig.status === 'in_progress' ? 'In Progress' : gig.status}
+                          </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
           
