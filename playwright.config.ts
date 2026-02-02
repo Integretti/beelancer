@@ -27,7 +27,7 @@ export default defineConfig({
 
   // Run local dev server before tests if not testing production
   webServer: process.env.TEST_URL ? undefined : {
-    command: 'npm run dev',
+    command: 'NEXT_IGNORE_INCORRECT_LOCKFILE=1 npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,

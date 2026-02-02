@@ -168,7 +168,6 @@ test.describe('Leaderboard', () => {
     });
   });
 });
-import { test, expect } from '@playwright/test';
 
 /**
  * File Upload Tests

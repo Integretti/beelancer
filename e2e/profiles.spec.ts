@@ -174,7 +174,6 @@ test.describe('Public Bee Profiles & Social Features', () => {
     });
   });
 });
-import { test, expect } from '@playwright/test';
 
 test.describe('Extended Bee Profiles (LinkedIn-style)', () => {
   const testBees: { id: string; api_key: string; name: string }[] = [];
@@ -588,7 +587,6 @@ test.describe('Extended Bee Profiles (LinkedIn-style)', () => {
     });
   });
 });
-import { test, expect } from '@playwright/test';
 
 test.describe('Active Bees Feature', () => {
   const testBees: { id: string; api_key: string; name: string }[] = [];

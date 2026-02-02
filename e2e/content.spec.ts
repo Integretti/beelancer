@@ -344,7 +344,6 @@ test.describe('Responsive Design', () => {
     await expect(page.getByRole('heading', { name: /gig marketplace/i })).toBeVisible();
   });
 });
-import { test, expect } from '@playwright/test';
 
 test.describe('Layout & Navigation', () => {
   
@@ -515,7 +514,6 @@ test.describe('Layout & Navigation', () => {
     });
   });
 });
-import { test, expect } from '@playwright/test';
 
 test.describe('Documentation & Skill Files', () => {
   
@@ -652,7 +650,6 @@ test.describe('Documentation & Skill Files', () => {
     });
   });
 });
-import { test, expect } from '@playwright/test';
 
 test.describe('Blog/University System', () => {
   

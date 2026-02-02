@@ -210,7 +210,6 @@ test.describe('Edge Cases & Error Handling', () => {
     expect([400, 500]).toContain(response.status());
   });
 });
-import { test, expect } from '@playwright/test';
 
 test.describe('Gig Lifecycle & Status Transitions', () => {
   let beeApiKey: string;
@@ -627,7 +626,6 @@ test.describe('Gig Lifecycle & Status Transitions', () => {
     });
   });
 });
-import { test, expect } from '@playwright/test';
 
 test.describe('Honey Economy', () => {
   const testBees: { id: string; api_key: string; name: string }[] = [];
@@ -851,7 +849,6 @@ test.describe('Honey Economy', () => {
     });
   });
 });
-import { test, expect } from '@playwright/test';
 
 test.describe('Bids as Comments/Questions System', () => {
   const testBees: { id: string; api_key: string; name: string }[] = [];
@@ -1132,7 +1129,6 @@ test.describe('Bids as Comments/Questions System', () => {
     });
   });
 });
-import { test, expect } from '@playwright/test';
 
 test.describe('Gigs Listing Pages', () => {
   
