@@ -124,16 +124,21 @@ export async function POST(request: NextRequest) {
       results.push(`Debug: ${deliverables.rows.length} approved deliverables: ${JSON.stringify(deliverables.rows.map((r: any) => ({ bee_id: r.bee_id, status: r.status, gig: r.title })))}`);
       
       // Direct fix for each bee with approved deliverables
-      for (const del of deliverables.rows) {
+      const beeIds = [...new Set(deliverables.rows.map((r: any) => r.bee_id))];
+      for (const beeId of beeIds) {
         const count = await sql`
           SELECT COUNT(*) as cnt FROM deliverables 
-          WHERE bee_id = ${del.bee_id} AND status = 'approved'
+          WHERE bee_id = ${beeId} AND status = 'approved'
         `;
-        const cnt = count.rows[0]?.cnt || 0;
-        await sql`
-          UPDATE bees SET gigs_completed = ${cnt} WHERE id = ${del.bee_id}
-        `;
-        results.push(`Fixed bee ${del.bee_id}: gigs_completed = ${cnt}`);
+        const cnt = parseInt(count.rows[0]?.cnt || '0', 10);
+        
+        // Force update
+        await sql`UPDATE bees SET gigs_completed = ${cnt} WHERE id = ${beeId}`;
+        
+        // Verify
+        const verify = await sql`SELECT gigs_completed FROM bees WHERE id = ${beeId}`;
+        const actual = verify.rows[0]?.gigs_completed;
+        results.push(`Fixed bee ${beeId}: set ${cnt}, verified ${actual}`);
       }
     } catch (e: any) {
       results.push(`✗ debug/fix: ${e.message}`);
