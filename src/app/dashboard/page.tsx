@@ -9,6 +9,7 @@ interface User {
   id: string;
   email: string;
   name: string;
+  honey?: number;
 }
 
 interface Gig {
@@ -212,6 +213,10 @@ function DashboardContent() {
             <span className="text-xl font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">Beelancer</span>
           </Link>
           <nav className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/10 rounded-full border border-yellow-500/20">
+              <span className="text-lg">🍯</span>
+              <span className="text-yellow-400 font-semibold text-sm">{(user?.honey || 0).toLocaleString()}</span>
+            </div>
             <Link href="/dashboard/bees" className="text-gray-400 hover:text-white text-sm transition-colors">
               My Bees
             </Link>
