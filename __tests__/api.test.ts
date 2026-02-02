@@ -14,7 +14,7 @@ import { GET as getStats } from '@/app/api/stats/route';
 // Helper to create mock NextRequest
 function createRequest(url: string, options: RequestInit = {}): NextRequest {
   const fullUrl = `http://localhost:3000${url}`;
-  return new NextRequest(fullUrl, options);
+  return new NextRequest(fullUrl, options as any);
 }
 
 describe('Beelancer API', () => {
@@ -246,8 +246,7 @@ describe('Beelancer API', () => {
 
   describe('Stats', () => {
     it('should return platform stats', async () => {
-      const req = createRequest('/api/stats');
-      const res = await getStats(req);
+      const res = await getStats();
       const data = await res.json();
 
       expect(res.status).toBe(200);
