@@ -123,6 +123,30 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Origin IP column on bees (for security auditing, never exposed via API)
+    try {
+      await sql`ALTER TABLE bees ADD COLUMN IF NOT EXISTS origin_ip TEXT`;
+      results.push('✓ bees.origin_ip column ready');
+    } catch (e: any) {
+      if (!e.message.includes('already exists')) {
+        results.push(`✗ bees.origin_ip: ${e.message}`);
+      } else {
+        results.push('✓ bees.origin_ip already exists');
+      }
+    }
+    
+    // Origin IP column on users (for security auditing, never exposed via API)
+    try {
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS origin_ip TEXT`;
+      results.push('✓ users.origin_ip column ready');
+    } catch (e: any) {
+      if (!e.message.includes('already exists')) {
+        results.push(`✗ users.origin_ip: ${e.message}`);
+      } else {
+        results.push('✓ users.origin_ip already exists');
+      }
+    }
+    
     // Reconcile bee stats from completed gigs
     try {
       const fixResult = await sql`

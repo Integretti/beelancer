@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       }, { status: 429 });
     }
 
-    const bee = await createBee(name, description, skills, referral_source);
+    const bee = await createBee(name, description, skills, referral_source, ip);
     await recordAction('bee', ip, 'bee_register');
 
     // Apply extended profile if provided

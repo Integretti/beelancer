@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Email already registered' }, { status: 409 });
     }
 
-    // Create user
-    const user = await createUser(email, password, name);
+    // Create user (store origin IP for security auditing)
+    const user = await createUser(email, password, name, ip);
 
     await recordAction('user', ip, 'auth_signup');
 

@@ -1505,7 +1505,7 @@ const AUTO_APPROVE_DELAY_MS = 7 * 24 * 60 * 60 * 1000;
 // ============ Database Operations ============
 // These work for both Postgres and SQLite
 
-export async function createUser(email: string, password: string, name?: string) {
+export async function createUser(email: string, password: string, name?: string, originIp?: string) {
   const id = uuidv4();
   const password_hash = hashPassword(password);
   const verification_token = generateVerificationCode();
@@ -1517,11 +1517,28 @@ export async function createUser(email: string, password: string, name?: string)
       INSERT INTO users (id, email, password_hash, name, verification_token, verification_expires)
       VALUES (${id}, ${email.toLowerCase()}, ${password_hash}, ${name || null}, ${verification_token}, ${verification_expires})
     `;
+    // Try to store origin_ip if column exists (for security auditing)
+    if (originIp) {
+      try {
+        await sql`UPDATE users SET origin_ip = ${originIp} WHERE id = ${id}`;
+      } catch (e) {
+        // Column may not exist yet - that's ok
+        console.log('users.origin_ip column not available yet');
+      }
+    }
   } else {
-    db.prepare(`
-      INSERT INTO users (id, email, password_hash, name, verification_token, verification_expires)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(id, email.toLowerCase(), password_hash, name || null, verification_token, verification_expires);
+    // SQLite - try with origin_ip, fallback without
+    try {
+      db.prepare(`
+        INSERT INTO users (id, email, password_hash, name, verification_token, verification_expires, origin_ip)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(id, email.toLowerCase(), password_hash, name || null, verification_token, verification_expires, originIp || null);
+    } catch (e) {
+      db.prepare(`
+        INSERT INTO users (id, email, password_hash, name, verification_token, verification_expires)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(id, email.toLowerCase(), password_hash, name || null, verification_token, verification_expires);
+    }
   }
 
   return { id, email, verification_token };
@@ -1633,14 +1650,14 @@ export async function deleteSession(token: string) {
   }
 }
 
-export async function createBee(name: string, description?: string, skills?: string[], referralSource?: string) {
+export async function createBee(name: string, description?: string, skills?: string[], referralSource?: string, originIp?: string) {
   const id = uuidv4();
   const api_key = generateApiKey();
 
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
-    // First insert core fields, then update referral_source if provided
-    // This handles the case where the column doesn't exist yet (migration pending)
+    // First insert core fields, then update optional columns
+    // This handles the case where columns don't exist yet (migration pending)
     await sql`
       INSERT INTO bees (id, api_key, name, description, skills, level)
       VALUES (${id}, ${api_key}, ${name}, ${description || null}, ${skills ? JSON.stringify(skills) : null}, 'new')
@@ -1654,19 +1671,35 @@ export async function createBee(name: string, description?: string, skills?: str
         console.log('referral_source column not available yet');
       }
     }
+    // Try to store origin_ip if column exists (for security auditing)
+    if (originIp) {
+      try {
+        await sql`UPDATE bees SET origin_ip = ${originIp} WHERE id = ${id}`;
+      } catch (e) {
+        // Column may not exist yet - that's ok
+        console.log('origin_ip column not available yet');
+      }
+    }
   } else {
-    // SQLite - try with referral_source, fallback without
+    // SQLite - try with all columns, fallback as needed
     try {
       db.prepare(`
-        INSERT INTO bees (id, api_key, name, description, skills, level, referral_source)
-        VALUES (?, ?, ?, ?, ?, 'new', ?)
-      `).run(id, api_key, name, description || null, skills ? JSON.stringify(skills) : null, referralSource || null);
+        INSERT INTO bees (id, api_key, name, description, skills, level, referral_source, origin_ip)
+        VALUES (?, ?, ?, ?, ?, 'new', ?, ?)
+      `).run(id, api_key, name, description || null, skills ? JSON.stringify(skills) : null, referralSource || null, originIp || null);
     } catch (e) {
-      // Fallback if column doesn't exist
-      db.prepare(`
-        INSERT INTO bees (id, api_key, name, description, skills, level)
-        VALUES (?, ?, ?, ?, ?, 'new')
-      `).run(id, api_key, name, description || null, skills ? JSON.stringify(skills) : null);
+      // Fallback if columns don't exist
+      try {
+        db.prepare(`
+          INSERT INTO bees (id, api_key, name, description, skills, level, referral_source)
+          VALUES (?, ?, ?, ?, ?, 'new', ?)
+        `).run(id, api_key, name, description || null, skills ? JSON.stringify(skills) : null, referralSource || null);
+      } catch (e2) {
+        db.prepare(`
+          INSERT INTO bees (id, api_key, name, description, skills, level)
+          VALUES (?, ?, ?, ?, ?, 'new')
+        `).run(id, api_key, name, description || null, skills ? JSON.stringify(skills) : null);
+      }
     }
   }
 
