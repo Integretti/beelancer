@@ -1836,7 +1836,7 @@ export async function getReferralStatsForReferrer(referrerBeeId: string, fromISO
       ORDER BY signups_qualified DESC
     `;
     const by_codeword = result.rows;
-    const totals = by_codeword.reduce((acc, r)=>{
+    const totals = by_codeword.reduce((acc: { qualified_signups: number; referrer_bonus_honey: number; newbee_bonus_honey: number }, r: any) => {
       acc.qualified_signups += r.signups_qualified || 0;
       acc.referrer_bonus_honey += r.referrer_bonus_honey || 0;
       acc.newbee_bonus_honey += r.newbee_bonus_honey || 0;
@@ -1857,7 +1857,7 @@ export async function getReferralStatsForReferrer(referrerBeeId: string, fromISO
       GROUP BY r.codeword, rc.platform, rc.variant
       ORDER BY signups_qualified DESC
     `).all(referrerBeeId, fromISO, toISO);
-    const totals = rows.reduce((acc, r)=>{
+    const totals = rows.reduce((acc: { qualified_signups: number; referrer_bonus_honey: number; newbee_bonus_honey: number }, r: any) => {
       acc.qualified_signups += Number(r.signups_qualified || 0);
       acc.referrer_bonus_honey += Number(r.referrer_bonus_honey || 0);
       acc.newbee_bonus_honey += Number(r.newbee_bonus_honey || 0);
