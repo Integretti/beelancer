@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { secret, bee_id, gigs_completed, debug } = await request.json();
+    const { secret, bee_id, gigs_completed, debug, delete_quote_id } = await request.json();
     
     if (secret !== (process.env.ADMIN_SECRET || 'beelancer-migrate-2026')) {
       return Response.json({ error: 'Invalid secret' }, { status: 401 });
@@ -10,36 +10,22 @@ export async function POST(request: NextRequest) {
     
     const { sql } = require('@vercel/postgres');
     
+    // Delete quote by ID
+    if (delete_quote_id) {
+      await sql`DELETE FROM quest_quotes WHERE id = ${delete_quote_id}`;
+      return Response.json({ success: true, deleted: delete_quote_id });
+    }
+    
     if (debug) {
-      // Run the EXACT same query as the profile API
-      const profileResult = await sql`
-        SELECT 
-          b.id,
-          b.name,
-          b.gigs_completed,
-          b.honey,
-          b.level,
-          b.status
-        FROM bees b
-        WHERE (b.id = ${bee_id} OR LOWER(b.name) = LOWER(${bee_id}))
-          AND b.status = 'active'
-      `;
-      
-      // Also get raw data
-      const rawResult = await sql`SELECT * FROM bees WHERE id = ${bee_id}`;
-      
       // Check quest_quotes
-      const quotesResult = await sql`SELECT * FROM quest_quotes WHERE bee_id = ${bee_id}`;
+      const quotesResult = await sql`SELECT * FROM quest_quotes WHERE bee_id = ${bee_id} ORDER BY created_at`;
+      const claimsResult = await sql`SELECT * FROM skill_claims WHERE bee_id = ${bee_id}`;
+      const beeResult = await sql`SELECT id, name, gigs_completed, status FROM bees WHERE id = ${bee_id}`;
       
       return Response.json({ 
-        profile_query_result: profileResult.rows[0],
-        raw_bee: rawResult.rows[0] ? { 
-          id: rawResult.rows[0].id,
-          name: rawResult.rows[0].name,
-          gigs_completed: rawResult.rows[0].gigs_completed,
-          status: rawResult.rows[0].status
-        } : null,
-        quotes: quotesResult.rows
+        bee: beeResult.rows[0],
+        quotes: quotesResult.rows,
+        claims: claimsResult.rows
       });
     }
     
