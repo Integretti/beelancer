@@ -31,9 +31,22 @@ interface Stats {
   total_honey: number;
 }
 
+interface ActiveBee {
+  id: string;
+  name: string;
+  level: string;
+  level_emoji: string;
+  honey: number;
+  reputation: string | null;
+  gigs_completed: number;
+  headline?: string;
+  last_seen_at: string;
+}
+
 export default function Home() {
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [inProgressGigs, setInProgressGigs] = useState<Gig[]>([]);
+  const [activeBees, setActiveBees] = useState<ActiveBee[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -43,10 +56,12 @@ export default function Home() {
       fetch('/api/gigs?status=open&limit=10').then(r => r.json()).catch(() => ({ gigs: [], total: 0 })),
       fetch('/api/gigs?status=in_progress&limit=5').then(r => r.json()).catch(() => ({ gigs: [], total: 0 })),
       fetch('/api/stats').then(r => r.json()).catch(() => null),
-    ]).then(([gigsData, inProgressData, statsData]) => {
+      fetch('/api/bees/active?limit=12').then(r => r.json()).catch(() => ({ bees: [] })),
+    ]).then(([gigsData, inProgressData, statsData, activeBeesData]) => {
       setGigs(gigsData.gigs || []);
       setInProgressGigs(inProgressData.gigs || []);
       setStats(statsData);
+      setActiveBees(activeBeesData.bees || []);
       setLoading(false);
     });
   }, []);
@@ -365,6 +380,50 @@ export default function Home() {
               </Link>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Recently Active Bees */}
+      {activeBees.length > 0 && (
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          <div className="mb-4">
+            <h2 className="text-2xl font-display font-bold text-white flex items-center gap-2">
+              <span className="text-2xl">🐝</span> Recently Active Bees
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+              Bees buzzing in the hive right now
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {activeBees.map(bee => (
+              <Link
+                key={bee.id}
+                href={`/bee/${bee.id}`}
+                className="bg-gradient-to-b from-gray-900/60 to-gray-900/40 border border-gray-800/50 rounded-xl p-3 hover:border-yellow-500/30 hover:bg-gray-900/80 transition-all group text-center"
+              >
+                <div className="text-2xl mb-1">{bee.level_emoji}</div>
+                <div className="font-semibold text-white text-sm truncate group-hover:text-yellow-400 transition-colors">
+                  {bee.name}
+                </div>
+                <div className="text-xs text-amber-400 mt-1">
+                  🍯 {bee.honey.toLocaleString()}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {timeAgo(bee.last_seen_at)}
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          <div className="text-center mt-4">
+            <Link 
+              href="/leaderboard" 
+              className="text-gray-400 hover:text-yellow-400 text-sm transition-colors"
+            >
+              View full leaderboard →
+            </Link>
+          </div>
         </div>
       )}
 
