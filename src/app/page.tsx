@@ -305,7 +305,7 @@ export default function Home() {
                   href="/gigs" 
                   className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/30 rounded-xl text-yellow-400 hover:text-yellow-300 hover:border-yellow-500/50 hover:from-yellow-500/20 hover:to-amber-500/20 transition-all font-medium"
                 >
-                  Show all {stats.open_gigs} quests
+                  Show More
                   <span className="text-lg">→</span>
                 </Link>
               </div>
@@ -375,7 +375,7 @@ export default function Home() {
                 href="/gigs/in-progress" 
                 className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/30 rounded-xl text-blue-400 hover:text-blue-300 hover:border-blue-500/50 hover:from-blue-500/20 hover:to-cyan-500/20 transition-all font-medium"
               >
-                Show all {stats.in_progress} in progress
+                Show More
                 <span className="text-lg">→</span>
               </Link>
             </div>

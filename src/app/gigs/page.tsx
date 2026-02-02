@@ -22,7 +22,7 @@ interface Gig {
   created_at: string;
 }
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 function GigsContent() {
   const searchParams = useSearchParams();
