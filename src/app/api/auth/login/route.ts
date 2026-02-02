@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserByEmail, verifyPassword, createSession } from '@/lib/db';
+import { getUserByEmail, verifyPassword, createSession, passwordHashNeedsUpgrade, hashPassword } from '@/lib/db';
 import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
@@ -24,6 +24,17 @@ export async function POST(request: NextRequest) {
 
     if (!verifyPassword(password, user.password_hash)) {
       return Response.json({ error: 'Invalid email or password' }, { status: 401 });
+    }
+
+    // Upgrade legacy password hashes on successful login (best-effort)
+    if (passwordHashNeedsUpgrade(user.password_hash)) {
+      try {
+        const { sql } = require('@vercel/postgres');
+        const upgraded = hashPassword(password);
+        await sql`UPDATE users SET password_hash = ${upgraded} WHERE id = ${user.id}`;
+      } catch (e) {
+        console.error('Password hash upgrade failed:', e);
+      }
     }
 
     if (!user.email_verified) {

@@ -1440,15 +1440,34 @@ function runMigrations() {
 // ============ Helper Functions ============
 
 export function hashPassword(password: string): string {
+  // Versioned PBKDF2 hash (allows future upgrades without breaking verification)
+  const iterations = parseInt(process.env.PBKDF2_ITERATIONS || '310000', 10);
   const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
-  return `${salt}:${hash}`;
+  const hash = crypto.pbkdf2Sync(password, salt, iterations, 64, 'sha512').toString('hex');
+  return `pbkdf2$${iterations}$${salt}$${hash}`;
 }
 
 export function verifyPassword(password: string, stored: string): boolean {
+  // New format: pbkdf2$<iterations>$<salt>$<hash>
+  if (stored.startsWith('pbkdf2$')) {
+    const parts = stored.split('$');
+    if (parts.length !== 4) return false;
+    const iterations = parseInt(parts[1], 10);
+    const salt = parts[2];
+    const hash = parts[3];
+    const verify = crypto.pbkdf2Sync(password, salt, iterations, 64, 'sha512').toString('hex');
+    return hash === verify;
+  }
+
+  // Legacy format: <salt>:<hash> (old PBKDF2 params)
   const [salt, hash] = stored.split(':');
+  if (!salt || !hash) return false;
   const verify = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
   return hash === verify;
+}
+
+export function passwordHashNeedsUpgrade(stored: string): boolean {
+  return !stored.startsWith('pbkdf2$');
 }
 
 export function generateToken(): string {
@@ -1845,6 +1864,22 @@ export async function getReferralStatsForReferrer(referrerBeeId: string, fromISO
       return acc;
     }, { qualified_signups: 0, referrer_bonus_honey: 0, newbee_bonus_honey: 0 });
     return { from: fromISO, to: toISO, totals, by_codeword: rows };
+  }
+}
+
+export async function rotateBeeApiKey(beeId: string) {
+  const newKey = generateApiKey();
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      UPDATE bees SET api_key = ${newKey}
+      WHERE id = ${beeId}
+      RETURNING id, name, api_key
+    `;
+    return result.rows[0];
+  } else {
+    db.prepare('UPDATE bees SET api_key = ? WHERE id = ?').run(newKey, beeId);
+    return db.prepare('SELECT id, name, api_key FROM bees WHERE id = ?').get(beeId);
   }
 }
 
