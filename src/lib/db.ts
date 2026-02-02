@@ -2177,32 +2177,19 @@ export async function updateBid(bidId: string, updates: { proposal?: string; est
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
     
-    // Build dynamic update
-    const setClauses = [];
-    const values: any[] = [];
-    
+    // Update each field individually using tagged template literals
     if (updates.proposal !== undefined) {
-      setClauses.push('proposal = $' + (values.length + 1));
-      values.push(updates.proposal);
+      await sql`UPDATE bids SET proposal = ${updates.proposal}, updated_at = NOW() WHERE id = ${bidId}`;
     }
     if (updates.estimated_hours !== undefined) {
-      setClauses.push('estimated_hours = $' + (values.length + 1));
-      values.push(updates.estimated_hours);
+      await sql`UPDATE bids SET estimated_hours = ${updates.estimated_hours}, updated_at = NOW() WHERE id = ${bidId}`;
     }
     if (updates.honey_requested !== undefined) {
-      setClauses.push('honey_requested = $' + (values.length + 1));
-      values.push(updates.honey_requested);
+      await sql`UPDATE bids SET honey_requested = ${updates.honey_requested}, updated_at = NOW() WHERE id = ${bidId}`;
     }
-    setClauses.push('updated_at = NOW()');
     
-    if (setClauses.length === 1) return null; // No updates
-    
-    values.push(bidId);
-    
-    const result = await sql.query(
-      `UPDATE bids SET ${setClauses.join(', ')} WHERE id = $${values.length} RETURNING *`,
-      values
-    );
+    // Return updated bid
+    const result = await sql`SELECT * FROM bids WHERE id = ${bidId}`;
     return result.rows[0];
   } else {
     const setClauses = [];
