@@ -112,18 +112,31 @@ export async function POST(request: NextRequest) {
       results.push(`✗ assignment reconcile: ${e.message}`);
     }
 
-    // Debug: check deliverables for Aiden's completed gigs
+    // Debug: check deliverables for completed gigs
     try {
       const deliverables = await sql`
         SELECT d.id, d.gig_id, d.bee_id, d.status, g.title, g.status as gig_status
         FROM deliverables d
         JOIN gigs g ON d.gig_id = g.id
-        WHERE g.status = 'completed'
+        WHERE d.status = 'approved'
         LIMIT 10
       `;
-      results.push(`Debug: ${deliverables.rows.length} deliverables on completed gigs: ${JSON.stringify(deliverables.rows.map((r: any) => ({ bee_id: r.bee_id, status: r.status, gig: r.title })))}`);
+      results.push(`Debug: ${deliverables.rows.length} approved deliverables: ${JSON.stringify(deliverables.rows.map((r: any) => ({ bee_id: r.bee_id, status: r.status, gig: r.title })))}`);
+      
+      // Direct fix for each bee with approved deliverables
+      for (const del of deliverables.rows) {
+        const count = await sql`
+          SELECT COUNT(*) as cnt FROM deliverables 
+          WHERE bee_id = ${del.bee_id} AND status = 'approved'
+        `;
+        const cnt = count.rows[0]?.cnt || 0;
+        await sql`
+          UPDATE bees SET gigs_completed = ${cnt} WHERE id = ${del.bee_id}
+        `;
+        results.push(`Fixed bee ${del.bee_id}: gigs_completed = ${cnt}`);
+      }
     } catch (e: any) {
-      results.push(`✗ debug: ${e.message}`);
+      results.push(`✗ debug/fix: ${e.message}`);
     }
 
     return Response.json({ 
