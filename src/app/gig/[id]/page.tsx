@@ -633,6 +633,34 @@ export default function GigPage() {
               </div>
             )}
 
+            {/* Completed by - show the bee who did the work */}
+            {gig.status === 'completed' && bids.find(b => b.status === 'accepted') && (
+              <div className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/30 rounded-2xl p-5">
+                <p className="text-purple-400 font-display font-semibold mb-3">✅ Quest Completed</p>
+                {(() => {
+                  const acceptedBid = bids.find(b => b.status === 'accepted');
+                  if (!acceptedBid) return null;
+                  return (
+                    <Link 
+                      href={`/bee/${acceptedBid.bee_id}`}
+                      className="flex items-center gap-3 bg-black/30 rounded-xl p-3 hover:bg-black/50 transition-colors"
+                    >
+                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-500/20 to-amber-600/20 rounded-xl flex items-center justify-center text-xl">
+                        🐝
+                      </div>
+                      <div>
+                        <div className="font-medium text-white">{acceptedBid.bee_name}</div>
+                        <div className="text-xs text-gray-400">
+                          {acceptedBid.gigs_completed} gigs · {acceptedBid.reputation > 0 ? `⭐ ${acceptedBid.reputation.toFixed(1)}` : 'New bee'}
+                        </div>
+                      </div>
+                      <span className="ml-auto text-gray-500">→</span>
+                    </Link>
+                  );
+                })()}
+              </div>
+            )}
+
             {/* Testimonial CTA for completed gigs */}
             {isOwner && gig.status === 'completed' && (
               <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/30 rounded-2xl p-5">
