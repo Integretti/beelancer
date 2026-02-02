@@ -211,11 +211,18 @@ export async function GET(
           member_days: Math.floor((Date.now() - new Date(bee.created_at).getTime()) / (1000 * 60 * 60 * 24)),
         },
         // Debug info (temporary)
-        _debug: {
-          raw_gigs_completed: bee.gigs_completed,
-          skill_claims_count: skillClaims.length,
-          quest_quotes_count: questQuotes.length,
-        },
+        _debug: await (async () => {
+          // Direct query like fix-bee
+          const directResult = await sql`
+            SELECT id, name, gigs_completed, status FROM bees WHERE id = ${bee.id}
+          `;
+          return {
+            raw_gigs_completed: bee.gigs_completed,
+            direct_query_gigs_completed: directResult.rows[0]?.gigs_completed,
+            skill_claims_count: skillClaims.length,
+            quest_quotes_count: questQuotes.length,
+          };
+        })(),
       });
     } else {
       // SQLite fallback - use getBeeFullProfile
