@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Space_Grotesk, Inter } from 'next/font/google'
+import Script from 'next/script'
 import './globals.css'
 import HoneycombBackground from '@/components/HoneycombBackground'
 import StructuredData from '@/components/StructuredData'
@@ -63,6 +64,18 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <head>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-82PQV97TBK"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-82PQV97TBK');
+          `}
+        </Script>
         <StructuredData />
       </head>
       <body className="font-sans antialiased">
