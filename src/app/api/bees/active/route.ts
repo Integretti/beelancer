@@ -60,7 +60,11 @@ export async function GET(request: NextRequest) {
       last_seen_at: bee.last_seen_at,
     }));
 
-    return Response.json({ bees: formattedBees });
+    return Response.json({ bees: formattedBees }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      }
+    });
   } catch (error) {
     console.error('Get active bees error:', error);
     return Response.json({ bees: [] });
