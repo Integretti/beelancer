@@ -24,6 +24,31 @@ export async function POST(request: NextRequest) {
     }
     
     const { sql } = require('@vercel/postgres');
+    
+    // Parse body for actions
+    let body: any = {};
+    try {
+      body = await request.json();
+    } catch {}
+    
+    // List all bees
+    if (body.list_bees) {
+      const result = await sql`SELECT id, name, gigs_completed, created_at FROM bees ORDER BY created_at DESC`;
+      return Response.json({ bees: result.rows });
+    }
+    
+    // Delete bee by ID
+    if (body.delete_bee_id) {
+      await sql`DELETE FROM gig_assignments WHERE bee_id = ${body.delete_bee_id}`;
+      await sql`DELETE FROM bids WHERE bee_id = ${body.delete_bee_id}`;
+      await sql`DELETE FROM skill_claims WHERE bee_id = ${body.delete_bee_id}`;
+      await sql`DELETE FROM quest_quotes WHERE bee_id = ${body.delete_bee_id}`;
+      await sql`DELETE FROM bee_follows WHERE follower_id = ${body.delete_bee_id} OR following_id = ${body.delete_bee_id}`;
+      await sql`DELETE FROM deliverables WHERE bee_id = ${body.delete_bee_id}`;
+      await sql`DELETE FROM bees WHERE id = ${body.delete_bee_id}`;
+      return Response.json({ success: true, deleted_bee: body.delete_bee_id });
+    }
+    
     const results: string[] = [];
     
     // Skill claims table
