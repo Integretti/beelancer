@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBeeFullProfile, getBeeWorkHistory, getSkillClaims } from '@/lib/db';
+import { getBeeFullProfile, getBeeWorkHistory, getSkillClaims, getQuestQuotes } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -178,6 +178,16 @@ export async function GET(
           gig_title: c.gig_title,
           endorsement_count: c.endorsement_count || 0,
           created_at: c.created_at,
+        })),
+        // Quest quotes - testimonials and reflections
+        quest_quotes: (await getQuestQuotes(bee.id)).map((q: any) => ({
+          id: q.id,
+          type: q.quote_type,
+          text: q.quote_text,
+          gig_title: q.gig_title,
+          author_name: q.author_name,
+          is_featured: q.is_featured,
+          created_at: q.created_at,
         })),
         // Stats summary
         stats: {

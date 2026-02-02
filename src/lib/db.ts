@@ -499,6 +499,23 @@ async function runPostgresMigrations() {
     )
   `;
 
+  // Quest quotes - testimonials from completed work
+  await sql`
+    CREATE TABLE IF NOT EXISTS quest_quotes (
+      id TEXT PRIMARY KEY,
+      bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      gig_id TEXT REFERENCES gigs(id) ON DELETE SET NULL,
+      gig_title TEXT,
+      quote_type TEXT NOT NULL,
+      quote_text TEXT NOT NULL,
+      author_bee_id TEXT REFERENCES bees(id) ON DELETE SET NULL,
+      author_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      author_name TEXT,
+      is_featured BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
   // Add unique index on bee names (for URL uniqueness)
   try {
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS bees_name_unique ON bees (LOWER(name)) WHERE status = 'active'`;
@@ -656,6 +673,20 @@ function initSQLite() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(claim_id, endorser_bee_id),
       UNIQUE(claim_id, endorser_user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS quest_quotes (
+      id TEXT PRIMARY KEY,
+      bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      gig_id TEXT REFERENCES gigs(id) ON DELETE SET NULL,
+      gig_title TEXT,
+      quote_type TEXT NOT NULL,
+      quote_text TEXT NOT NULL,
+      author_bee_id TEXT REFERENCES bees(id) ON DELETE SET NULL,
+      author_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      author_name TEXT,
+      is_featured INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS gigs (
@@ -1925,6 +1956,71 @@ export async function getEndorsers(claimId: string) {
       WHERE se.claim_id = ?
       ORDER BY se.created_at DESC
     `).all(claimId);
+  }
+}
+
+// Quest quotes - testimonials from completed work
+export async function addQuestQuote(
+  beeId: string,
+  quoteType: 'bee_reflection' | 'client_testimonial',
+  quoteText: string,
+  gigId?: string,
+  gigTitle?: string,
+  authorBeeId?: string,
+  authorUserId?: string,
+  authorName?: string
+) {
+  const id = crypto.randomUUID();
+  
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`
+      INSERT INTO quest_quotes (id, bee_id, gig_id, gig_title, quote_type, quote_text, author_bee_id, author_user_id, author_name)
+      VALUES (${id}, ${beeId}, ${gigId || null}, ${gigTitle || null}, ${quoteType}, ${quoteText}, ${authorBeeId || null}, ${authorUserId || null}, ${authorName || null})
+    `;
+  } else {
+    db.prepare(`
+      INSERT INTO quest_quotes (id, bee_id, gig_id, gig_title, quote_type, quote_text, author_bee_id, author_user_id, author_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, beeId, gigId || null, gigTitle || null, quoteType, quoteText, authorBeeId || null, authorUserId || null, authorName || null);
+  }
+  
+  return { id };
+}
+
+export async function getQuestQuotes(beeId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      SELECT * FROM quest_quotes
+      WHERE bee_id = ${beeId}
+      ORDER BY is_featured DESC, created_at DESC
+    `;
+    return result.rows;
+  } else {
+    return db.prepare(`
+      SELECT * FROM quest_quotes
+      WHERE bee_id = ?
+      ORDER BY is_featured DESC, created_at DESC
+    `).all(beeId);
+  }
+}
+
+export async function deleteQuestQuote(quoteId: string, beeId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`DELETE FROM quest_quotes WHERE id = ${quoteId} AND bee_id = ${beeId}`;
+  } else {
+    db.prepare('DELETE FROM quest_quotes WHERE id = ? AND bee_id = ?').run(quoteId, beeId);
+  }
+}
+
+export async function toggleQuoteFeatured(quoteId: string, beeId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`UPDATE quest_quotes SET is_featured = NOT is_featured WHERE id = ${quoteId} AND bee_id = ${beeId}`;
+  } else {
+    db.prepare('UPDATE quest_quotes SET is_featured = NOT is_featured WHERE id = ? AND bee_id = ?').run(quoteId, beeId);
   }
 }
 

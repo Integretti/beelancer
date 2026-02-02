@@ -34,6 +34,16 @@ interface SkillClaim {
   created_at: string;
 }
 
+interface QuestQuote {
+  id: string;
+  type: 'bee_reflection' | 'client_testimonial';
+  text: string;
+  gig_title: string | null;
+  author_name: string | null;
+  is_featured: boolean;
+  created_at: string;
+}
+
 // Level progression config
 const LEVEL_CONFIG: Record<string, { next: string | null; gigsRequired: number; label: string }> = {
   new: { next: 'worker', gigsRequired: 3, label: 'New Bee' },
@@ -127,6 +137,7 @@ export default function BeeProfilePage() {
   const [activeGigs, setActiveGigs] = useState<Gig[]>([]);
   const [createdGigs, setCreatedGigs] = useState<Gig[]>([]);
   const [skillClaims, setSkillClaims] = useState<SkillClaim[]>([]);
+  const [questQuotes, setQuestQuotes] = useState<QuestQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'followers' | 'following'>('overview');
@@ -150,6 +161,7 @@ export default function BeeProfilePage() {
         setActiveGigs(data.active_gigs || []);
         setCreatedGigs(data.created_gigs || []);
         setSkillClaims(data.skill_claims || []);
+        setQuestQuotes(data.quest_quotes || []);
       } catch (e) {
         setError('Failed to load profile');
       } finally {
@@ -367,6 +379,52 @@ export default function BeeProfilePage() {
                               👍 {claim.endorsement_count}
                             </span>
                           )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Quest Quotes - Testimonials and Reflections */}
+              {questQuotes.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <span className="text-purple-400">💬</span> Quest Quotes
+                    <span className="text-gray-500 text-sm font-normal">({questQuotes.length})</span>
+                  </h2>
+                  <div className="space-y-3">
+                    {questQuotes.map((quote) => (
+                      <div
+                        key={quote.id}
+                        className={`rounded-xl p-4 ${
+                          quote.type === 'client_testimonial'
+                            ? 'bg-gradient-to-r from-yellow-900/20 to-gray-900/50 border border-yellow-500/20'
+                            : 'bg-gradient-to-r from-purple-900/20 to-gray-900/50 border border-purple-500/20'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl">
+                            {quote.type === 'client_testimonial' ? '⭐' : '💭'}
+                          </span>
+                          <div className="flex-1">
+                            <p className="text-gray-300 text-sm mb-2 italic">"{quote.text}"</p>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              {quote.author_name && (
+                                <span className={quote.type === 'client_testimonial' ? 'text-yellow-400' : 'text-purple-400'}>
+                                  — {quote.author_name}
+                                </span>
+                              )}
+                              {quote.gig_title && (
+                                <span>on "{quote.gig_title}"</span>
+                              )}
+                              {quote.is_featured && (
+                                <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">
+                                  Featured
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
