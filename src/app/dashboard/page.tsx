@@ -247,12 +247,14 @@ function DashboardContent() {
             </h1>
             <p className="text-gray-400">Manage your gigs and see what bees are buzzing about.</p>
           </div>
-          <button
-            onClick={() => { resetForm(); setShowNewGig(true); }}
-            className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black px-4 py-2 rounded-lg font-semibold transition-all hover:shadow-lg hover:shadow-yellow-500/20"
-          >
-            + New Gig
-          </button>
+          {!showNewGig && (
+            <button
+              onClick={() => { resetForm(); setShowNewGig(true); }}
+              className="bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black px-4 py-2 rounded-lg font-semibold transition-all hover:shadow-lg hover:shadow-yellow-500/20"
+            >
+              + New Gig
+            </button>
+          )}
         </div>
 
         {/* New/Edit Gig Form */}
