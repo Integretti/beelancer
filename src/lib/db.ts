@@ -96,7 +96,35 @@ async function initPostgres() {
       disputes_lost INTEGER DEFAULT 0,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       last_seen_at TIMESTAMP,
-      unregistered_at TIMESTAMP
+      unregistered_at TIMESTAMP,
+      -- Extended LinkedIn-style profile fields
+      headline TEXT,
+      about TEXT,
+      capabilities TEXT,
+      tools TEXT,
+      languages TEXT,
+      availability TEXT DEFAULT 'available',
+      portfolio_url TEXT,
+      github_url TEXT,
+      website_url TEXT
+    )
+  `;
+
+  // Work history - anonymized project records (auto-populated from completed gigs)
+  await sql`
+    CREATE TABLE IF NOT EXISTS bee_work_history (
+      id TEXT PRIMARY KEY,
+      bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      gig_id TEXT REFERENCES gigs(id) ON DELETE SET NULL,
+      title TEXT NOT NULL,
+      category TEXT,
+      summary TEXT,
+      skills_used TEXT,
+      duration_hours REAL,
+      rating INTEGER,
+      client_feedback TEXT,
+      completed_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `;
 
@@ -396,6 +424,34 @@ async function runPostgresMigrations() {
   await addColumnIfNotExists('bees', 'level', 'TEXT', "'new'");
   await addColumnIfNotExists('bees', 'disputes_involved', 'INTEGER', '0');
   await addColumnIfNotExists('bees', 'disputes_lost', 'INTEGER', '0');
+  // Extended profile fields
+  await addColumnIfNotExists('bees', 'headline', 'TEXT');
+  await addColumnIfNotExists('bees', 'about', 'TEXT');
+  await addColumnIfNotExists('bees', 'capabilities', 'TEXT');
+  await addColumnIfNotExists('bees', 'tools', 'TEXT');
+  await addColumnIfNotExists('bees', 'languages', 'TEXT');
+  await addColumnIfNotExists('bees', 'availability', 'TEXT', "'available'");
+  await addColumnIfNotExists('bees', 'portfolio_url', 'TEXT');
+  await addColumnIfNotExists('bees', 'github_url', 'TEXT');
+  await addColumnIfNotExists('bees', 'website_url', 'TEXT');
+
+  // Create work history table if it doesn't exist
+  await sql`
+    CREATE TABLE IF NOT EXISTS bee_work_history (
+      id TEXT PRIMARY KEY,
+      bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      gig_id TEXT REFERENCES gigs(id) ON DELETE SET NULL,
+      title TEXT NOT NULL,
+      category TEXT,
+      summary TEXT,
+      skills_used TEXT,
+      duration_hours REAL,
+      rating INTEGER,
+      client_feedback TEXT,
+      completed_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
 
   // Gigs table migrations
   await addColumnIfNotExists('gigs', 'revision_count', 'INTEGER', '0');
@@ -463,7 +519,32 @@ function initSQLite() {
       disputes_lost INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       last_seen_at TEXT,
-      unregistered_at TEXT
+      unregistered_at TEXT,
+      -- Extended LinkedIn-style profile fields
+      headline TEXT,
+      about TEXT,
+      capabilities TEXT,
+      tools TEXT,
+      languages TEXT,
+      availability TEXT DEFAULT 'available',
+      portfolio_url TEXT,
+      github_url TEXT,
+      website_url TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS bee_work_history (
+      id TEXT PRIMARY KEY,
+      bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      gig_id TEXT REFERENCES gigs(id) ON DELETE SET NULL,
+      title TEXT NOT NULL,
+      category TEXT,
+      summary TEXT,
+      skills_used TEXT,
+      duration_hours REAL,
+      rating INTEGER,
+      client_feedback TEXT,
+      completed_at TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS gigs (
@@ -1072,6 +1153,16 @@ function runMigrations() {
     `ALTER TABLE bees ADD COLUMN level TEXT DEFAULT 'new'`,
     `ALTER TABLE bees ADD COLUMN disputes_involved INTEGER DEFAULT 0`,
     `ALTER TABLE bees ADD COLUMN disputes_lost INTEGER DEFAULT 0`,
+    // Extended profile fields
+    `ALTER TABLE bees ADD COLUMN headline TEXT`,
+    `ALTER TABLE bees ADD COLUMN about TEXT`,
+    `ALTER TABLE bees ADD COLUMN capabilities TEXT`,
+    `ALTER TABLE bees ADD COLUMN tools TEXT`,
+    `ALTER TABLE bees ADD COLUMN languages TEXT`,
+    `ALTER TABLE bees ADD COLUMN availability TEXT DEFAULT 'available'`,
+    `ALTER TABLE bees ADD COLUMN portfolio_url TEXT`,
+    `ALTER TABLE bees ADD COLUMN github_url TEXT`,
+    `ALTER TABLE bees ADD COLUMN website_url TEXT`,
     // Gigs table migrations
     `ALTER TABLE gigs ADD COLUMN revision_count INTEGER DEFAULT 0`,
     `ALTER TABLE gigs ADD COLUMN max_revisions INTEGER DEFAULT 3`,
@@ -1086,6 +1177,28 @@ function runMigrations() {
     `ALTER TABLE users ADD COLUMN login_code TEXT`,
     `ALTER TABLE users ADD COLUMN login_code_expires TEXT`,
   ];
+
+  // Create work history table for SQLite
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS bee_work_history (
+        id TEXT PRIMARY KEY,
+        bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+        gig_id TEXT REFERENCES gigs(id) ON DELETE SET NULL,
+        title TEXT NOT NULL,
+        category TEXT,
+        summary TEXT,
+        skills_used TEXT,
+        duration_hours REAL,
+        rating INTEGER,
+        client_feedback TEXT,
+        completed_at TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  } catch (e) {
+    // Table might already exist
+  }
 
   for (const migration of migrations) {
     try {
@@ -1374,6 +1487,270 @@ export async function updateBeeLevel(beeId: string) {
     } else {
       db.prepare('UPDATE bees SET level = ? WHERE id = ?').run(newLevel, beeId);
     }
+  }
+}
+
+// Extended profile update
+export interface BeeProfileUpdate {
+  description?: string;
+  skills?: string[];
+  headline?: string;
+  about?: string;
+  capabilities?: string[];
+  tools?: string[];
+  languages?: string[];
+  availability?: 'available' | 'busy' | 'unavailable';
+  portfolio_url?: string;
+  github_url?: string;
+  website_url?: string;
+}
+
+export async function updateBeeProfile(beeId: string, updates: BeeProfileUpdate) {
+  const fields: string[] = [];
+  const values: any[] = [];
+
+  if (updates.description !== undefined) {
+    fields.push('description');
+    values.push(updates.description);
+  }
+  if (updates.skills !== undefined) {
+    fields.push('skills');
+    values.push(JSON.stringify(updates.skills));
+  }
+  if (updates.headline !== undefined) {
+    fields.push('headline');
+    values.push(updates.headline);
+  }
+  if (updates.about !== undefined) {
+    fields.push('about');
+    values.push(updates.about);
+  }
+  if (updates.capabilities !== undefined) {
+    fields.push('capabilities');
+    values.push(JSON.stringify(updates.capabilities));
+  }
+  if (updates.tools !== undefined) {
+    fields.push('tools');
+    values.push(JSON.stringify(updates.tools));
+  }
+  if (updates.languages !== undefined) {
+    fields.push('languages');
+    values.push(JSON.stringify(updates.languages));
+  }
+  if (updates.availability !== undefined) {
+    fields.push('availability');
+    values.push(updates.availability);
+  }
+  if (updates.portfolio_url !== undefined) {
+    fields.push('portfolio_url');
+    values.push(updates.portfolio_url);
+  }
+  if (updates.github_url !== undefined) {
+    fields.push('github_url');
+    values.push(updates.github_url);
+  }
+  if (updates.website_url !== undefined) {
+    fields.push('website_url');
+    values.push(updates.website_url);
+  }
+
+  if (fields.length === 0) return;
+
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    // Build dynamic update query for Postgres
+    const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(', ');
+    await sql.query(`UPDATE bees SET ${setClause} WHERE id = $1`, [beeId, ...values]);
+  } else {
+    const setClause = fields.map(f => `${f} = ?`).join(', ');
+    db.prepare(`UPDATE bees SET ${setClause} WHERE id = ?`).run(...values, beeId);
+  }
+}
+
+// Work history management
+export interface WorkHistoryEntry {
+  bee_id: string;
+  gig_id?: string;
+  title: string;
+  category?: string;
+  summary?: string;
+  skills_used?: string[];
+  duration_hours?: number;
+  rating?: number;
+  client_feedback?: string;
+  completed_at?: string;
+}
+
+export async function createWorkHistoryEntry(entry: WorkHistoryEntry) {
+  const id = uuidv4();
+  const skills_used = entry.skills_used ? JSON.stringify(entry.skills_used) : null;
+  const completed_at = entry.completed_at || new Date().toISOString();
+
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`
+      INSERT INTO bee_work_history (id, bee_id, gig_id, title, category, summary, skills_used, duration_hours, rating, client_feedback, completed_at)
+      VALUES (${id}, ${entry.bee_id}, ${entry.gig_id || null}, ${entry.title}, ${entry.category || null}, ${entry.summary || null}, ${skills_used}, ${entry.duration_hours || null}, ${entry.rating || null}, ${entry.client_feedback || null}, ${completed_at})
+    `;
+  } else {
+    db.prepare(`
+      INSERT INTO bee_work_history (id, bee_id, gig_id, title, category, summary, skills_used, duration_hours, rating, client_feedback, completed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, entry.bee_id, entry.gig_id || null, entry.title, entry.category || null, entry.summary || null, skills_used, entry.duration_hours || null, entry.rating || null, entry.client_feedback || null, completed_at);
+  }
+
+  return { id };
+}
+
+export async function getBeeWorkHistory(beeId: string, limit: number = 20) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      SELECT * FROM bee_work_history
+      WHERE bee_id = ${beeId}
+      ORDER BY completed_at DESC
+      LIMIT ${limit}
+    `;
+    return result.rows.map((row: any) => ({
+      ...row,
+      skills_used: row.skills_used ? JSON.parse(row.skills_used) : []
+    }));
+  } else {
+    const rows = db.prepare(`
+      SELECT * FROM bee_work_history
+      WHERE bee_id = ?
+      ORDER BY completed_at DESC
+      LIMIT ?
+    `).all(beeId, limit) as any[];
+    return rows.map(row => ({
+      ...row,
+      skills_used: row.skills_used ? JSON.parse(row.skills_used) : []
+    }));
+  }
+}
+
+// Get full bee profile with work history (for public profile view)
+export async function getBeeFullProfile(beeId: string) {
+  const bee = await getBeeById(beeId) as any;
+  if (!bee) return null;
+
+  const workHistory = await getBeeWorkHistory(beeId, 10);
+
+  // Parse JSON fields
+  const parseJson = (val: string | null) => {
+    if (!val) return [];
+    try { return JSON.parse(val); } catch { return []; }
+  };
+
+  return {
+    id: bee.id,
+    name: bee.name,
+    headline: bee.headline,
+    about: bee.about || bee.description,
+    description: bee.description,
+    skills: parseJson(bee.skills),
+    capabilities: parseJson(bee.capabilities),
+    tools: parseJson(bee.tools),
+    languages: parseJson(bee.languages),
+    availability: bee.availability || 'available',
+    portfolio_url: bee.portfolio_url,
+    github_url: bee.github_url,
+    website_url: bee.website_url,
+    // Stats
+    level: bee.level,
+    level_emoji: getBeeLevelEmoji(bee.level),
+    honey: bee.honey,
+    reputation: bee.reputation,
+    gigs_completed: bee.gigs_completed,
+    disputes_involved: bee.disputes_involved || 0,
+    disputes_lost: bee.disputes_lost || 0,
+    // Timestamps
+    created_at: bee.created_at,
+    last_seen_at: bee.last_seen_at,
+    // Work history (anonymized project records)
+    work_history: workHistory
+  };
+}
+
+// Create work history entry from completed gig (anonymized for bee's resume)
+async function createWorkHistoryFromGig(beeId: string, gig: any, deliverable: any) {
+  // Anonymize the title - make it generic based on category
+  const categoryTitles: Record<string, string> = {
+    'backend': 'Backend Development Project',
+    'frontend': 'Frontend Development Project',
+    'fullstack': 'Full-Stack Development Project',
+    'design': 'Design Project',
+    'writing': 'Content Writing Project',
+    'research': 'Research Project',
+    'data': 'Data Analysis Project',
+    'automation': 'Automation Project',
+    'api': 'API Development Project',
+    'mobile': 'Mobile Development Project',
+    'devops': 'DevOps Project',
+    'testing': 'Testing & QA Project',
+    'other': 'Project'
+  };
+
+  const category = gig.category?.toLowerCase() || 'other';
+  const anonymizedTitle = categoryTitles[category] || `${category.charAt(0).toUpperCase() + category.slice(1)} Project`;
+
+  // Calculate duration if we have assignment data
+  let durationHours = null;
+  if (gig.created_at && deliverable.submitted_at) {
+    const start = new Date(gig.created_at).getTime();
+    const end = new Date(deliverable.submitted_at).getTime();
+    durationHours = Math.round((end - start) / (1000 * 60 * 60) * 10) / 10;
+  }
+
+  // Create a generic summary based on deliverable type
+  let summary = deliverable.title || 'Completed project deliverables';
+  // Don't include specific URLs or content - just the type
+  if (deliverable.type === 'link') {
+    summary = `Delivered ${deliverable.title || 'project'} (external link)`;
+  } else if (deliverable.type === 'code') {
+    summary = `Delivered ${deliverable.title || 'code implementation'}`;
+  } else if (deliverable.type === 'document') {
+    summary = `Delivered ${deliverable.title || 'documentation'}`;
+  }
+
+  // Get bee's skills to include as skills_used (these are what they claimed)
+  const bee = await getBeeById(beeId) as any;
+  let skillsUsed: string[] = [];
+  if (bee?.skills) {
+    try {
+      skillsUsed = JSON.parse(bee.skills).slice(0, 5); // Top 5 skills
+    } catch {}
+  }
+
+  await createWorkHistoryEntry({
+    bee_id: beeId,
+    gig_id: gig.id,
+    title: anonymizedTitle,
+    category: gig.category,
+    summary: summary,
+    skills_used: skillsUsed,
+    duration_hours: durationHours || undefined,
+    rating: undefined, // Will be updated when review is submitted
+    client_feedback: undefined, // Will be updated when review is submitted
+    completed_at: new Date().toISOString()
+  });
+}
+
+// Update work history with review data
+export async function updateWorkHistoryWithReview(gigId: string, rating: number, comment?: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`
+      UPDATE bee_work_history 
+      SET rating = ${rating}, client_feedback = ${comment || null}
+      WHERE gig_id = ${gigId}
+    `;
+  } else {
+    db.prepare(`
+      UPDATE bee_work_history 
+      SET rating = ?, client_feedback = ?
+      WHERE gig_id = ?
+    `).run(rating, comment || null, gigId);
   }
 }
 
@@ -1815,6 +2192,9 @@ export async function approveDeliverable(deliverableId: string, gigId: string, u
     // Update bee level
     await updateBeeLevel(deliverable.bee_id);
 
+    // Create anonymized work history entry for the bee's profile
+    await createWorkHistoryFromGig(deliverable.bee_id, gig, deliverable);
+
     return true;
   } else {
     const gig = db.prepare('SELECT * FROM gigs WHERE id = ? AND user_id = ?').get(gigId, userId) as any;
@@ -1842,6 +2222,9 @@ export async function approveDeliverable(deliverableId: string, gigId: string, u
     
     // Update bee level
     await updateBeeLevel(deliverable.bee_id);
+
+    // Create anonymized work history entry for the bee's profile
+    await createWorkHistoryFromGig(deliverable.bee_id, gig, deliverable);
 
     return true;
   }
