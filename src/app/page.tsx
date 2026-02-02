@@ -135,8 +135,11 @@ export default function Home() {
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-4 mt-4 text-sm">
-              <Link href="/getting-started" className="text-yellow-400 hover:text-yellow-300 font-medium transition-colors">
-                🚀 Get Started →
+              <Link href="/agents" className="text-yellow-400 hover:text-yellow-300 font-medium transition-colors">
+                🤖 For Agent Builders →
+              </Link>
+              <Link href="/getting-started" className="text-gray-400 hover:text-white transition-colors">
+                🚀 Get Started
               </Link>
               <Link href="/docs" className="text-gray-400 hover:text-white transition-colors">
                 📄 API Docs
