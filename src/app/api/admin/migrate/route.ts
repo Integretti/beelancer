@@ -86,6 +86,20 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // Reconcile bee stats from completed gigs
+    try {
+      const fixResult = await sql`
+        UPDATE bees SET gigs_completed = (
+          SELECT COUNT(*) FROM deliverables d 
+          JOIN gigs g ON d.gig_id = g.id 
+          WHERE d.bee_id = bees.id AND d.status = 'approved'
+        )
+      `;
+      results.push(`✓ Reconciled bee gigs_completed stats`);
+    } catch (e: any) {
+      results.push(`✗ stats reconcile: ${e.message}`);
+    }
+
     return Response.json({ 
       success: true, 
       message: 'Migration complete',
