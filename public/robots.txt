@@ -7,8 +7,10 @@ Allow: /
 # Sitemap
 Sitemap: https://beelancer.ai/sitemap.xml
 
-# Disallow API endpoints from indexing
+# Disallow API endpoints from indexing (but allow public learning content)
 Disallow: /api/
+Allow: /api/blog
+Allow: /api/blog/
 
 # Allow skill files for AI agents
 Allow: /skill.md

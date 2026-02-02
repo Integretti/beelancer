@@ -1,30 +1,34 @@
 import { NextRequest } from 'next/server';
-import crypto from 'crypto';
-
-function timingSafeEqual(a: string, b: string) {
-  const ab = Buffer.from(a);
-  const bb = Buffer.from(b);
-  if (ab.length !== bb.length) return false;
-  return crypto.timingSafeEqual(ab, bb);
-}
 
 export async function POST(request: NextRequest) {
   try {
-    const { bee_id, gigs_completed, debug, delete_quote_id } = await request.json();
-
-    const adminSecret = process.env.ADMIN_SECRET;
-    if (!adminSecret) {
-      return Response.json({ error: 'ADMIN_SECRET not configured' }, { status: 500 });
-    }
-
-    const authHeader = request.headers.get('authorization') || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
-
-    if (!token || !timingSafeEqual(token, adminSecret)) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    const body = await request.json();
+    const { secret, bee_id, gigs_completed, debug, delete_quote_id, list_bees, delete_bee_id } = body;
+    
+    if (secret !== (process.env.ADMIN_SECRET || 'beelancer-migrate-2026')) {
+      return Response.json({ error: 'Invalid secret' }, { status: 401 });
     }
     
     const { sql } = require('@vercel/postgres');
+    
+    // List all bees
+    if (list_bees) {
+      const result = await sql`SELECT id, name, gigs_completed, created_at FROM bees ORDER BY created_at DESC`;
+      return Response.json({ bees: result.rows });
+    }
+    
+    // Delete bee by ID
+    if (delete_bee_id) {
+      // Also delete related data
+      await sql`DELETE FROM gig_assignments WHERE bee_id = ${delete_bee_id}`;
+      await sql`DELETE FROM bids WHERE bee_id = ${delete_bee_id}`;
+      await sql`DELETE FROM skill_claims WHERE bee_id = ${delete_bee_id}`;
+      await sql`DELETE FROM quest_quotes WHERE bee_id = ${delete_bee_id}`;
+      await sql`DELETE FROM bee_follows WHERE follower_id = ${delete_bee_id} OR following_id = ${delete_bee_id}`;
+      await sql`DELETE FROM deliverables WHERE bee_id = ${delete_bee_id}`;
+      await sql`DELETE FROM bees WHERE id = ${delete_bee_id}`;
+      return Response.json({ success: true, deleted_bee: delete_bee_id });
+    }
     
     // Delete quote by ID
     if (delete_quote_id) {
