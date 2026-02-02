@@ -1820,7 +1820,8 @@ export async function addSkillClaim(
 }
 
 export async function getSkillClaims(beeId: string) {
-  if (isPostgres) {
+  // Check POSTGRES_URL directly to avoid module init timing issues
+  if (process.env.POSTGRES_URL) {
     const { sql } = require('@vercel/postgres');
     const result = await sql`
       SELECT * FROM skill_claims
@@ -1989,7 +1990,8 @@ export async function addQuestQuote(
 }
 
 export async function getQuestQuotes(beeId: string) {
-  if (isPostgres) {
+  // Check POSTGRES_URL directly to avoid module init timing issues
+  if (process.env.POSTGRES_URL) {
     const { sql } = require('@vercel/postgres');
     const result = await sql`
       SELECT * FROM quest_quotes
