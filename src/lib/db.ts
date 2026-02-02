@@ -106,7 +106,8 @@ async function initPostgres() {
       availability TEXT DEFAULT 'available',
       portfolio_url TEXT,
       github_url TEXT,
-      website_url TEXT
+      website_url TEXT,
+      referral_source TEXT
     )
   `;
 
@@ -434,6 +435,7 @@ async function runPostgresMigrations() {
   await addColumnIfNotExists('bees', 'portfolio_url', 'TEXT');
   await addColumnIfNotExists('bees', 'github_url', 'TEXT');
   await addColumnIfNotExists('bees', 'website_url', 'TEXT');
+  await addColumnIfNotExists('bees', 'referral_source', 'TEXT');
 
   // Create work history table if it doesn't exist
   await sql`
@@ -537,7 +539,8 @@ function initSQLite() {
       availability TEXT DEFAULT 'available',
       portfolio_url TEXT,
       github_url TEXT,
-      website_url TEXT
+      website_url TEXT,
+      referral_source TEXT
     );
 
     CREATE TABLE IF NOT EXISTS bee_work_history (
@@ -1171,6 +1174,7 @@ function runMigrations() {
     `ALTER TABLE bees ADD COLUMN portfolio_url TEXT`,
     `ALTER TABLE bees ADD COLUMN github_url TEXT`,
     `ALTER TABLE bees ADD COLUMN website_url TEXT`,
+    `ALTER TABLE bees ADD COLUMN referral_source TEXT`,
     // Gigs table migrations
     `ALTER TABLE gigs ADD COLUMN revision_count INTEGER DEFAULT 0`,
     `ALTER TABLE gigs ADD COLUMN max_revisions INTEGER DEFAULT 3`,
@@ -1397,21 +1401,21 @@ export async function deleteSession(token: string) {
   }
 }
 
-export async function createBee(name: string, description?: string, skills?: string[]) {
+export async function createBee(name: string, description?: string, skills?: string[], referralSource?: string) {
   const id = uuidv4();
   const api_key = generateApiKey();
 
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
     await sql`
-      INSERT INTO bees (id, api_key, name, description, skills, level)
-      VALUES (${id}, ${api_key}, ${name}, ${description || null}, ${skills ? JSON.stringify(skills) : null}, 'new')
+      INSERT INTO bees (id, api_key, name, description, skills, level, referral_source)
+      VALUES (${id}, ${api_key}, ${name}, ${description || null}, ${skills ? JSON.stringify(skills) : null}, 'new', ${referralSource || null})
     `;
   } else {
     db.prepare(`
-      INSERT INTO bees (id, api_key, name, description, skills, level)
-      VALUES (?, ?, ?, ?, ?, 'new')
-    `).run(id, api_key, name, description || null, skills ? JSON.stringify(skills) : null);
+      INSERT INTO bees (id, api_key, name, description, skills, level, referral_source)
+      VALUES (?, ?, ?, ?, ?, 'new', ?)
+    `).run(id, api_key, name, description || null, skills ? JSON.stringify(skills) : null, referralSource || null);
   }
 
   return { id, api_key, name };

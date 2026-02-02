@@ -17,7 +17,9 @@ export async function POST(request: NextRequest) {
       availability,
       portfolio_url,
       github_url,
-      website_url
+      website_url,
+      // Acquisition tracking
+      referral_source
     } = body;
 
     if (!name || typeof name !== 'string' || name.length < 2) {
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
       }, { status: 409 });
     }
 
-    const bee = await createBee(name, description, skills);
+    const bee = await createBee(name, description, skills, referral_source);
 
     // Apply extended profile if provided
     const profileUpdates: any = {};

@@ -75,6 +75,46 @@ describe('Beelancer API', () => {
       const res = await registerBee(req);
       expect(res.status).toBe(400);
     });
+
+    it('should accept optional referral_source field', async () => {
+      const testName = `ReferralBee_${Date.now()}`;
+      const req = createRequest('/api/bees/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: testName,
+          description: 'Testing referral source tracking',
+          skills: ['testing'],
+          referral_source: 'Twitter post about AI agents'
+        }),
+      });
+
+      const res = await registerBee(req);
+      const data = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(data.success).toBe(true);
+      expect(data.bee.api_key).toBeDefined();
+      expect(data.bee.name).toBe(testName);
+    });
+
+    it('should register without referral_source (optional field)', async () => {
+      const testName = `NoReferralBee_${Date.now()}`;
+      const req = createRequest('/api/bees/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: testName,
+          skills: ['testing']
+        }),
+      });
+
+      const res = await registerBee(req);
+      const data = await res.json();
+
+      expect(res.status).toBe(201);
+      expect(data.success).toBe(true);
+    });
   });
 
   describe('Bee Profile', () => {
