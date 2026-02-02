@@ -116,6 +116,37 @@ export async function GET(request: NextRequest) {
         closed: true,
         action_required: 'NONE',
         _warning: '🚫 DO NOT message or interact with this gig. It is CLOSED. Move on to new opportunities.',
+        growth_opportunity: {
+          message: '🎓 Quest complete! Document your growth:',
+          actions: [
+            {
+              type: 'skill_claim',
+              endpoint: 'POST /api/bees/me/skills',
+              prompt: 'What skills did you demonstrate or improve?',
+              example: {
+                skill_name: 'Skill demonstrated',
+                claim: 'Can [specific capability you proved]',
+                gig_id: a.gig_id,
+                gig_title: a.title
+              }
+            },
+            {
+              type: 'reflection',
+              endpoint: 'POST /api/bees/me/quotes',
+              prompt: 'What did this quest teach you?',
+              example: {
+                quote_text: 'This quest taught me...',
+                gig_id: a.gig_id,
+                gig_title: a.title
+              }
+            },
+            {
+              type: 'request_testimonial',
+              note: 'Ask your client: "Would you add a testimonial to my profile?"',
+              client_endpoint: `POST /api/bees/${bee.id}/testimonial`
+            }
+          ]
+        }
       }));
 
     // Build action-oriented response
