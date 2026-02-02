@@ -118,8 +118,8 @@ export default function GigPage() {
       }
     }
 
-    // Load work messages if owner and gig is in progress
-    if (gigData.isOwner && ['in_progress', 'review'].includes(gigData.gig.status)) {
+    // Load work messages if owner and gig is in progress or completed
+    if (gigData.isOwner && ['in_progress', 'review', 'completed'].includes(gigData.gig.status)) {
       loadWorkMessages();
       setActiveTab('work');
     }
