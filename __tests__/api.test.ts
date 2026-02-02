@@ -177,63 +177,34 @@ describe('Beelancer API', () => {
       // Each gig should have creator info
       for (const gig of data.gigs) {
         expect(gig.creator_type).toBeDefined();
-        expect(['human', 'bee']).toContain(gig.creator_type);
-        
-        // Should have a creator name (either user_name or creator_bee_name)
-        if (gig.creator_type === 'human') {
-          expect(gig.user_name || gig.creator?.name).toBeDefined();
-        } else if (gig.creator_type === 'bee') {
-          expect(gig.creator_bee_name || gig.creator?.name).toBeDefined();
-        }
+        // All gigs are human-created
+        expect(gig.creator_type).toBe('human');
+        expect(gig.user_name || gig.creator?.name).toBeDefined();
       }
     });
   });
 
   describe('Gig Detail', () => {
-    it('should return gig details for human-created gigs', async () => {
-      // First get a list of gigs to find a human-created one
+    it('should return gig details', async () => {
+      // First get a list of gigs
       const listReq = createRequest('/api/gigs?status=open');
       const listRes = await getGigs(listReq);
       const listData = await listRes.json();
       
-      const humanGig = listData.gigs.find((g: any) => g.creator_type === 'human');
-      if (!humanGig) {
-        console.log('No human-created gigs found, skipping test');
+      if (!listData.gigs || listData.gigs.length === 0) {
+        console.log('No gigs found, skipping test');
         return;
       }
 
-      const req = createRequest(`/api/gigs/${humanGig.id}`);
-      const res = await getGigById(req, { params: Promise.resolve({ id: humanGig.id }) });
+      const gig = listData.gigs[0];
+      const req = createRequest(`/api/gigs/${gig.id}`);
+      const res = await getGigById(req, { params: Promise.resolve({ id: gig.id }) });
       const data = await res.json();
 
       expect(res.status).toBe(200);
       expect(data.gig).toBeDefined();
-      expect(data.gig.id).toBe(humanGig.id);
+      expect(data.gig.id).toBe(gig.id);
       expect(data.gig.title).toBeDefined();
-    });
-
-    it('should return gig details for bee-created gigs', async () => {
-      // First get a list of gigs to find a bee-created one
-      const listReq = createRequest('/api/gigs?status=open');
-      const listRes = await getGigs(listReq);
-      const listData = await listRes.json();
-      
-      const beeGig = listData.gigs.find((g: any) => g.creator_type === 'bee');
-      if (!beeGig) {
-        console.log('No bee-created gigs found, skipping test');
-        return;
-      }
-
-      const req = createRequest(`/api/gigs/${beeGig.id}`);
-      const res = await getGigById(req, { params: Promise.resolve({ id: beeGig.id }) });
-      const data = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(data.gig).toBeDefined();
-      expect(data.gig.id).toBe(beeGig.id);
-      expect(data.gig.title).toBeDefined();
-      expect(data.gig.creator_type).toBe('bee');
-      expect(data.gig.creator_bee_name).toBeDefined();
     });
 
     it('should return 404 for non-existent gig', async () => {

@@ -1809,43 +1809,27 @@ export async function updateWorkHistoryWithReview(gigId: string, rating: number,
   }
 }
 
+// Only humans can create gigs
 export async function createGig(userId: string, data: { title: string; description?: string; requirements?: string; price_cents?: number; category?: string; deadline?: string; status?: string }) {
-  return createGigInternal('human', userId, null, data);
-}
-
-export async function createGigAsBee(beeId: string, data: { title: string; description?: string; requirements?: string; price_cents?: number; category?: string; deadline?: string; status?: string }) {
-  return createGigInternal('bee', null, beeId, data);
-}
-
-async function createGigInternal(
-  creatorType: 'human' | 'bee',
-  userId: string | null,
-  beeId: string | null,
-  data: { title: string; description?: string; requirements?: string; price_cents?: number; category?: string; deadline?: string; status?: string }
-) {
   const id = uuidv4();
   const status = data.status || 'open'; // Default to 'open' (publish), not 'draft'
 
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
     await sql`
-      INSERT INTO gigs (id, user_id, creator_type, creator_bee_id, title, description, requirements, price_cents, category, deadline, status)
-      VALUES (${id}, ${userId}, ${creatorType}, ${beeId}, ${data.title}, ${data.description || null}, ${data.requirements || null}, ${data.price_cents || 0}, ${data.category || null}, ${data.deadline || null}, ${status})
+      INSERT INTO gigs (id, user_id, creator_type, title, description, requirements, price_cents, category, deadline, status)
+      VALUES (${id}, ${userId}, 'human', ${data.title}, ${data.description || null}, ${data.requirements || null}, ${data.price_cents || 0}, ${data.category || null}, ${data.deadline || null}, ${status})
     `;
-    if (creatorType === 'human' && userId) {
-      await sql`UPDATE users SET total_gigs_posted = total_gigs_posted + 1 WHERE id = ${userId}`;
-    }
+    await sql`UPDATE users SET total_gigs_posted = total_gigs_posted + 1 WHERE id = ${userId}`;
   } else {
     db.prepare(`
-      INSERT INTO gigs (id, user_id, creator_type, creator_bee_id, title, description, requirements, price_cents, category, deadline, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, userId, creatorType, beeId, data.title, data.description || null, data.requirements || null, data.price_cents || 0, data.category || null, data.deadline || null, status);
-    if (creatorType === 'human' && userId) {
-      db.prepare('UPDATE users SET total_gigs_posted = total_gigs_posted + 1 WHERE id = ?').run(userId);
-    }
+      INSERT INTO gigs (id, user_id, creator_type, title, description, requirements, price_cents, category, deadline, status)
+      VALUES (?, ?, 'human', ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, userId, data.title, data.description || null, data.requirements || null, data.price_cents || 0, data.category || null, data.deadline || null, status);
+    db.prepare('UPDATE users SET total_gigs_posted = total_gigs_posted + 1 WHERE id = ?').run(userId);
   }
 
-  return { id, creator_type: creatorType, status, ...data };
+  return { id, creator_type: 'human', status, ...data };
 }
 
 export async function updateGig(id: string, userId: string, data: any) {

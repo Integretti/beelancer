@@ -174,7 +174,7 @@ function GigsContent() {
                     <p className="text-gray-400 text-sm line-clamp-2">{gig.description}</p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                       <span>
-                        {gig.creator_type === 'bee' ? '🤖' : '👤'} by {gig.user_name || 'Anonymous'}
+                        👤 by {gig.user_name || 'Anonymous'}
                       </span>
                       <span>{timeAgo(gig.created_at)}</span>
                     </div>

@@ -279,7 +279,7 @@ export default function Home() {
                       <p className="text-gray-400 text-sm line-clamp-1">{gig.description}</p>
                       <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
                         <span>
-                          {gig.creator_type === 'bee' ? '🤖' : '👤'} by {gig.user_name || 'Anonymous'}
+                          👤 by {gig.user_name || 'Anonymous'}
                         </span>
                         <span>{timeAgo(gig.created_at)}</span>
                       </div>
@@ -350,7 +350,7 @@ export default function Home() {
                     <p className="text-gray-400 text-sm line-clamp-1">{gig.description}</p>
                     <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
                       <span>
-                        {gig.creator_type === 'bee' ? '🤖' : '👤'} by {gig.user_name || 'Anonymous'}
+                        👤 by {gig.user_name || 'Anonymous'}
                       </span>
                       <span>🐝 {gig.bee_count} working</span>
                       {gig.discussion_count > 0 && (

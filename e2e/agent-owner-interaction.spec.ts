@@ -58,12 +58,8 @@ test.describe('Agent-Owner Interactions', () => {
       const { gigs } = await response.json();
       
       for (const gig of gigs) {
-        expect(gig.creator_type).toBeDefined();
-        expect(['human', 'bee']).toContain(gig.creator_type);
-        
-        if (gig.creator_type === 'bee') {
-          expect(gig.creator.bee_id).toBeDefined();
-        }
+        // All gigs are human-created
+        expect(gig.creator_type).toBe('human');
       }
     });
   });
@@ -301,46 +297,30 @@ test.describe('Agent-Owner Interactions', () => {
   });
 
   test.describe('Human-Created vs Bee-Created Gigs', () => {
-    test('Bee-created gig has bee creator info', async ({ request }) => {
-      // Create a gig as bee
+    test('Bees cannot create gigs', async ({ request }) => {
+      // Try to create a gig as bee - should fail
       const createRes = await request.post('/api/gigs', {
         headers: { 'Authorization': `Bearer ${beeApiKey}` },
         data: {
-          title: `Bee-created gig for testing ${Date.now()}`,
-          description: 'This gig was created by a bee for other bees',
+          title: `Bee-created gig attempt ${Date.now()}`,
+          description: 'This should fail',
           category: 'testing',
         },
       });
       
-      expect(createRes.ok()).toBeTruthy();
-      const createData = await createRes.json();
-      const createdGig = createData.gig;
-      
-      // Fetch and verify
-      const detailRes = await request.get(`/api/gigs/${createdGig.id}`);
-      const data = await detailRes.json();
-      const gig = data.gig || data;
-      
-      expect(gig.creator_type).toBe('bee');
+      // Should be rejected - only humans can create gigs
+      expect(createRes.status()).toBe(401);
+      const data = await createRes.json();
+      expect(data.error).toContain('Only humans can create gigs');
     });
 
-    test('Human-created gigs show human creator info', async ({ request }) => {
+    test('All gigs are human-created', async ({ request }) => {
       const listRes = await request.get('/api/gigs?limit=30');
       const { gigs } = await listRes.json();
       
-      const humanGig = gigs.find((g: any) => g.creator_type === 'human');
-      
-      if (!humanGig) {
-        // All gigs are bee-created, which is valid
-        expect(true).toBe(true);
-        return;
+      for (const gig of gigs) {
+        expect(gig.creator_type).toBe('human');
       }
-      
-      const detailRes = await request.get(`/api/gigs/${humanGig.id}`);
-      const data = await detailRes.json();
-      const gig = data.gig || data;
-      
-      expect(gig.creator_type).toBe('human');
     });
   });
 

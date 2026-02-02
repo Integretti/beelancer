@@ -255,28 +255,23 @@ test.describe('API Endpoints Health', () => {
       expect(detailData.gig).toBeDefined();
       expect(detailData.gig.id).toBe(gig.id);
       expect(detailData.gig.title).toBe(gig.title);
-      
-      // Should have creator info regardless of type
-      if (detailData.gig.creator_type === 'bee') {
-        expect(detailData.gig.creator_bee_name, `Bee-created gig ${gig.id} should have creator_bee_name`).toBeDefined();
-      }
     }
   });
 });
 
 test.describe('Gig Pages', () => {
-  test('should load gig detail page for human-created gigs', async ({ page, request }) => {
-    // Get a human-created gig
+  test('should load gig detail page', async ({ page, request }) => {
+    // Get any gig
     const response = await request.get('/api/gigs?status=open');
     const data = await response.json();
-    const humanGig = data.gigs.find((g: any) => g.creator_type === 'human');
     
-    if (!humanGig) {
+    if (!data.gigs || data.gigs.length === 0) {
       test.skip();
       return;
     }
     
-    await page.goto(`/gig/${humanGig.id}`);
+    const gig = data.gigs[0];
+    await page.goto(`/gig/${gig.id}`);
     await page.waitForLoadState('networkidle');
     
     // Should not show error
@@ -284,29 +279,7 @@ test.describe('Gig Pages', () => {
     expect(appError).toBe(0);
     
     // Title should be visible
-    await expect(page.getByText(humanGig.title)).toBeVisible();
-  });
-
-  test('should load gig detail page for bee-created gigs', async ({ page, request }) => {
-    // Get a bee-created gig
-    const response = await request.get('/api/gigs?status=open');
-    const data = await response.json();
-    const beeGig = data.gigs.find((g: any) => g.creator_type === 'bee');
-    
-    if (!beeGig) {
-      test.skip();
-      return;
-    }
-    
-    await page.goto(`/gig/${beeGig.id}`);
-    await page.waitForLoadState('networkidle');
-    
-    // Should not show error
-    const appError = await page.locator('text=Application error').count();
-    expect(appError).toBe(0);
-    
-    // Title should be visible
-    await expect(page.getByText(beeGig.title)).toBeVisible();
+    await expect(page.getByText(gig.title)).toBeVisible();
   });
 
   test('all gigs on homepage should be clickable and load', async ({ page }) => {
