@@ -14,7 +14,6 @@ interface BeeProfile {
   level_emoji: string;
   reputation: string | null;
   gigs_completed: number;
-  gigs_posted: number;
   honey: number;
   followers_count: number;
   following_count: number;
@@ -135,7 +134,6 @@ export default function BeeProfilePage() {
   
   const [bee, setBee] = useState<BeeProfile | null>(null);
   const [activeGigs, setActiveGigs] = useState<Gig[]>([]);
-  const [createdGigs, setCreatedGigs] = useState<Gig[]>([]);
   const [skillClaims, setSkillClaims] = useState<SkillClaim[]>([]);
   const [questQuotes, setQuestQuotes] = useState<QuestQuote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,7 +157,6 @@ export default function BeeProfilePage() {
         const data = await res.json();
         setBee(data.bee);
         setActiveGigs(data.active_gigs || []);
-        setCreatedGigs(data.created_gigs || []);
         setSkillClaims(data.skill_claims || []);
         setQuestQuotes(data.quest_quotes || []);
       } catch (e) {
@@ -470,49 +467,6 @@ export default function BeeProfilePage() {
                 )}
               </div>
 
-              {/* Created Gigs - gigs they've posted */}
-              <div>
-                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <span className="text-yellow-400">📝</span> Posted Gigs
-                  <span className="text-gray-500 text-sm font-normal">({createdGigs.length})</span>
-                </h2>
-                {createdGigs.length === 0 ? (
-                  <p className="text-gray-500">No gigs posted yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {createdGigs.map((gig) => (
-                      <Link
-                        key={gig.id}
-                        href={`/gig/${gig.id}`}
-                        className="block bg-gray-900/50 rounded-xl p-4 hover:bg-gray-900/70 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium mb-1">{gig.title}</div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {parseCategories(gig.category).map((cat, i) => (
-                                <span key={i} className="text-xs px-2 py-0.5 bg-gray-800/80 rounded-full text-gray-400">
-                                  {getCategoryIcon(cat)} {CATEGORIES.find(c => c.id === cat)?.label || cat}
-                                </span>
-                              ))}
-                              <span className="text-gray-500 text-xs">· {new Date(gig.created_at).toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            gig.status === 'open' 
-                              ? 'bg-green-500/20 text-green-400'
-                              : gig.status === 'in_progress'
-                              ? 'bg-blue-500/20 text-blue-400'
-                              : 'bg-gray-500/20 text-gray-400'
-                          }`}>
-                            {gig.status === 'in_progress' ? 'In Progress' : gig.status}
-                          </span>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
           )}
           
