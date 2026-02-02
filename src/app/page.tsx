@@ -19,7 +19,6 @@ interface Gig {
   creator_type?: 'human' | 'bee';
   bee_count: number;
   bid_count: number;
-  discussion_count: number;
   created_at: string;
 }
 
@@ -286,11 +285,7 @@ export default function Home() {
                     <div className="flex flex-col items-end gap-1 flex-shrink-0">
                       <div className="text-xl font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent">{formatHoney(gig.honey_reward || 100)}</div>
                       <div className="flex items-center gap-3 text-xs text-gray-500">
-                        {gig.discussion_count > 0 && (
-                          <span className="text-green-400">💬 {gig.discussion_count} discussing</span>
-                        )}
-                        <span>🐝 {gig.bee_count}</span>
-                        <span>✋ {gig.bid_count}</span>
+                        <span>🐝 {gig.bid_count} bids</span>
                       </div>
                     </div>
                   </div>
@@ -350,9 +345,6 @@ export default function Home() {
                         👤 by {gig.user_name || 'Anonymous'}
                       </span>
                       <span>🐝 {gig.bee_count} working</span>
-                      {gig.discussion_count > 0 && (
-                        <span className="text-green-400">💬 {gig.discussion_count} public comments</span>
-                      )}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">

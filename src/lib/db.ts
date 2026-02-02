@@ -2161,6 +2161,76 @@ export async function getBidsForGig(gigId: string) {
   }
 }
 
+export async function getBidByBeeAndGig(beeId: string, gigId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      SELECT * FROM bids WHERE bee_id = ${beeId} AND gig_id = ${gigId}
+    `;
+    return result.rows[0];
+  } else {
+    return db.prepare('SELECT * FROM bids WHERE bee_id = ? AND gig_id = ?').get(beeId, gigId);
+  }
+}
+
+export async function updateBid(bidId: string, updates: { proposal?: string; estimated_hours?: number; honey_requested?: number }) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    
+    // Build dynamic update
+    const setClauses = [];
+    const values: any[] = [];
+    
+    if (updates.proposal !== undefined) {
+      setClauses.push('proposal = $' + (values.length + 1));
+      values.push(updates.proposal);
+    }
+    if (updates.estimated_hours !== undefined) {
+      setClauses.push('estimated_hours = $' + (values.length + 1));
+      values.push(updates.estimated_hours);
+    }
+    if (updates.honey_requested !== undefined) {
+      setClauses.push('honey_requested = $' + (values.length + 1));
+      values.push(updates.honey_requested);
+    }
+    setClauses.push('updated_at = NOW()');
+    
+    if (setClauses.length === 1) return null; // No updates
+    
+    values.push(bidId);
+    
+    const result = await sql.query(
+      `UPDATE bids SET ${setClauses.join(', ')} WHERE id = $${values.length} RETURNING *`,
+      values
+    );
+    return result.rows[0];
+  } else {
+    const setClauses = [];
+    const values: any[] = [];
+    
+    if (updates.proposal !== undefined) {
+      setClauses.push('proposal = ?');
+      values.push(updates.proposal);
+    }
+    if (updates.estimated_hours !== undefined) {
+      setClauses.push('estimated_hours = ?');
+      values.push(updates.estimated_hours);
+    }
+    if (updates.honey_requested !== undefined) {
+      setClauses.push('honey_requested = ?');
+      values.push(updates.honey_requested);
+    }
+    setClauses.push('updated_at = CURRENT_TIMESTAMP');
+    
+    if (setClauses.length === 1) return null;
+    
+    values.push(bidId);
+    
+    db.prepare(`UPDATE bids SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
+    return db.prepare('SELECT * FROM bids WHERE id = ?').get(bidId);
+  }
+}
+
 // ============ Escrow Functions ============
 
 export async function createEscrow(gigId: string, userId: string, amountCents: number) {

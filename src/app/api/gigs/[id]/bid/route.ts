@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
-import { createBid, getBeeByApiKey, getGigById, acceptBid, getSessionUser, getUserById } from '@/lib/db';
+import { createBid, getBeeByApiKey, getGigById, acceptBid, getSessionUser, getUserById, updateBid, getBidByBeeAndGig } from '@/lib/db';
 import { sendNotification, sendBidNotificationEmail } from '@/lib/email';
 import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
+// POST - Create a new bid (bees only)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -35,19 +36,15 @@ export async function POST(
     const { proposal, estimated_hours, honey_requested } = body;
 
     if (!proposal || proposal.length < 10) {
-      return Response.json({ error: 'Proposal required (min 10 characters)' }, { status: 400 });
+      return Response.json({ error: 'Proposal/comment required (min 10 characters)' }, { status: 400 });
     }
 
-    // Validate honey_requested - required and must be <= gig's honey_reward
+    // honey_requested can be 0 (question/comment) or up to gig's honey_reward
     const honeyReward = gig.honey_reward || 0;
     const requestedHoney = parseInt(honey_requested) || 0;
     
-    if (requestedHoney <= 0) {
-      return Response.json({ 
-        error: 'honey_requested is required and must be greater than 0',
-        gig_honey_reward: honeyReward,
-        hint: 'Specify how much honey you want for completing this gig (up to the gig reward)'
-      }, { status: 400 });
+    if (requestedHoney < 0) {
+      return Response.json({ error: 'honey_requested cannot be negative' }, { status: 400 });
     }
     
     if (requestedHoney > honeyReward) {
@@ -76,9 +73,11 @@ export async function POST(
       if (owner?.email) {
         sendNotification(gig.user_id, 'bid', () =>
           sendBidNotificationEmail(owner.email, gig.title, bee.name)
-        ).catch(console.error); // Fire and forget
+        ).catch(console.error);
       }
     }
+
+    const isQuestion = requestedHoney === 0;
 
     return Response.json({ 
       success: true, 
@@ -86,29 +85,110 @@ export async function POST(
         ...bid,
         honey_requested: requestedHoney,
       },
-      honey_info: {
-        requested: requestedHoney,
-        gig_reward: honeyReward,
-        platform_fee: '10%',
-        you_will_receive: Math.floor(requestedHoney * 0.9),
-      },
+      type: isQuestion ? 'question' : 'bid',
+      message: isQuestion 
+        ? '✅ Question posted! You can update your bid with a price later using PUT.'
+        : '✅ Bid submitted!',
+      ...(isQuestion ? {} : {
+        honey_info: {
+          requested: requestedHoney,
+          gig_reward: honeyReward,
+          platform_fee: '10%',
+          you_will_receive: Math.floor(requestedHoney * 0.9),
+        },
+      }),
       next_steps: {
-        message: '✅ Bid submitted! Now you MUST poll to know when it\'s accepted.',
-        action: 'Poll GET /api/bees/assignments every 5 minutes',
-        why: 'Beelancer does NOT notify you. If you don\'t poll, you\'ll miss when you\'re hired.',
-        check_endpoint: '/api/bees/assignments',
+        poll_endpoint: '/api/bees/assignments',
         poll_interval_minutes: 5,
+        update_bid: 'PUT /api/gigs/:id/bid to update your proposal or honey_requested',
       },
     }, { status: 201 });
   } catch (error: any) {
     if (error.message?.includes('UNIQUE') || error.message?.includes('duplicate')) {
-      return Response.json({ error: 'You have already bid on this gig' }, { status: 409 });
+      return Response.json({ 
+        error: 'You have already bid on this gig. Use PUT to update your existing bid.',
+        hint: 'PUT /api/gigs/:id/bid with { proposal?, honey_requested? }'
+      }, { status: 409 });
     }
     console.error('Bid error:', error);
     return Response.json({ error: 'Failed to place bid' }, { status: 500 });
   }
 }
 
+// PUT - Update an existing bid (bees only)
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return Response.json({ error: 'API key required' }, { status: 401 });
+    }
+
+    const apiKey = authHeader.slice(7);
+    const bee = await getBeeByApiKey(apiKey) as any;
+
+    if (!bee) {
+      return Response.json({ error: 'Invalid API key' }, { status: 401 });
+    }
+
+    const { id: gigId } = await params;
+    const gig = await getGigById(gigId) as any;
+
+    if (!gig) {
+      return Response.json({ error: 'Gig not found' }, { status: 404 });
+    }
+
+    // Check for existing bid
+    const existingBid = await getBidByBeeAndGig(bee.id, gigId);
+    if (!existingBid) {
+      return Response.json({ error: 'No existing bid found. Use POST to create a new bid.' }, { status: 404 });
+    }
+
+    if ((existingBid as any).status !== 'pending') {
+      return Response.json({ error: 'Cannot update bid - it has already been accepted or rejected' }, { status: 400 });
+    }
+
+    const body = await request.json();
+    const { proposal, estimated_hours, honey_requested } = body;
+
+    // Validate honey_requested if provided
+    if (honey_requested !== undefined) {
+      const honeyReward = gig.honey_reward || 0;
+      const requestedHoney = parseInt(honey_requested) || 0;
+      
+      if (requestedHoney < 0) {
+        return Response.json({ error: 'honey_requested cannot be negative' }, { status: 400 });
+      }
+      
+      if (requestedHoney > honeyReward) {
+        return Response.json({ 
+          error: `honey_requested (${requestedHoney}) exceeds gig's honey_reward (${honeyReward})`,
+          max_allowed: honeyReward
+        }, { status: 400 });
+      }
+    }
+
+    // Update the bid
+    const updatedBid = await updateBid((existingBid as any).id, {
+      proposal: proposal || undefined,
+      estimated_hours: estimated_hours || undefined,
+      honey_requested: honey_requested !== undefined ? parseInt(honey_requested) : undefined,
+    });
+
+    return Response.json({ 
+      success: true,
+      message: 'Bid updated successfully',
+      bid: updatedBid,
+    });
+  } catch (error) {
+    console.error('Update bid error:', error);
+    return Response.json({ error: 'Failed to update bid' }, { status: 500 });
+  }
+}
+
+// PATCH - Accept a bid (gig owner only)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

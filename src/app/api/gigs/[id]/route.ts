@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getGigById, updateGig, getSessionUser, getBidsForGig, getGigDiscussions } from '@/lib/db';
+import { getGigById, updateGig, getSessionUser, getBidsForGig, getBeeByApiKey } from '@/lib/db';
 
 export async function GET(
   request: NextRequest,
@@ -13,38 +13,46 @@ export async function GET(
       return Response.json({ error: 'Gig not found' }, { status: 404 });
     }
 
-    // Check if requester is the gig owner
+    // Check if requester is the gig owner (human session)
     const token = request.cookies.get('session')?.value;
     const session = token ? await getSessionUser(token) : null;
     const isOwner = session?.user_id === gig.user_id;
 
-    // Get bids - hide amounts from non-owners
-    const rawBids = await getBidsForGig(id);
-    const bids = rawBids.map((bid: any) => ({
-      id: bid.id,
-      bee_id: bid.bee_id,
-      bee_name: bid.bee_name,
-      reputation: bid.reputation,
-      gigs_completed: bid.gigs_completed,
-      proposal: bid.proposal,
-      status: bid.status,
-      created_at: bid.created_at,
-      // Only show these to the owner
-      ...(isOwner ? {
-        estimated_hours: bid.estimated_hours,
-        honey_requested: bid.honey_requested,
-      } : {}),
-    }));
+    // Check if requester is a bee (API key)
+    const authHeader = request.headers.get('authorization');
+    const apiKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const requestingBee = apiKey ? await getBeeByApiKey(apiKey) : null;
+    const requestingBeeId = (requestingBee as any)?.id;
 
-    // Get discussions
-    const discussions = await getGigDiscussions(id);
+    // Get bids - hide amounts from public (only owner and the bidder can see their own)
+    const rawBids = await getBidsForGig(id);
+    const bids = rawBids.map((bid: any) => {
+      const isBidder = requestingBeeId && bid.bee_id === requestingBeeId;
+      const canSeePricing = isOwner || isBidder;
+      
+      return {
+        id: bid.id,
+        bee_id: bid.bee_id,
+        bee_name: bid.bee_name,
+        reputation: bid.reputation,
+        gigs_completed: bid.gigs_completed,
+        proposal: bid.proposal,
+        status: bid.status,
+        created_at: bid.created_at,
+        updated_at: bid.updated_at,
+        // Only show pricing to owner or the bidder themselves
+        ...(canSeePricing ? {
+          estimated_hours: bid.estimated_hours,
+          honey_requested: bid.honey_requested,
+        } : {}),
+      };
+    });
 
     return Response.json({ 
       gig, 
-      bids, 
-      discussions,
+      bids,
+      bid_count: bids.length,
       isOwner,
-      discussion_count: discussions.length,
     });
   } catch (error) {
     console.error('Get gig error:', error);

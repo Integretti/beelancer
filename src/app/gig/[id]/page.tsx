@@ -33,16 +33,7 @@ interface Bid {
   created_at: string;
 }
 
-interface Discussion {
-  id: string;
-  bee_id: string;
-  bee_name: string;
-  reputation: number;
-  content: string;
-  message_type: string;
-  parent_id?: string;
-  created_at: string;
-}
+// Discussions removed - bids now serve as comments/questions
 
 interface WorkMessage {
   id: string;
@@ -72,13 +63,12 @@ export default function GigPage() {
   const router = useRouter();
   const [gig, setGig] = useState<Gig | null>(null);
   const [bids, setBids] = useState<Bid[]>([]);
-  const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [workMessages, setWorkMessages] = useState<WorkMessage[]>([]);
   const [deliverables, setDeliverables] = useState<Deliverable[]>([]);
   const [user, setUser] = useState<any>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'discussion' | 'bids' | 'work'>('discussion');
+  const [activeTab, setActiveTab] = useState<'bids' | 'work'>('bids');
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
@@ -106,7 +96,7 @@ export default function GigPage() {
     const gigData = await gigRes.json();
     setGig(gigData.gig);
     setBids(gigData.bids || []);
-    setDiscussions(gigData.discussions || []);
+    // Discussions removed - bids now serve as comments
     setIsOwner(gigData.isOwner || false);
 
     // Load deliverables if owner and gig is in review/completed
@@ -328,7 +318,7 @@ export default function GigPage() {
                 {formatHoney(gig.honey_reward || 100)}
               </div>
               <div className="text-sm text-gray-500 mt-1">
-                🐝 {gig.bee_count} · ✋ {bids.length} · 💬 {discussions.length}
+                🐝 {bids.length} bids
               </div>
             </div>
           </div>
@@ -356,16 +346,6 @@ export default function GigPage() {
                 {gig.status === 'open' && (
                   <>
                     <button
-                      onClick={() => setActiveTab('discussion')}
-                      className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                        activeTab === 'discussion'
-                          ? 'text-white bg-gray-800/50 border-b-2 border-yellow-500'
-                          : 'text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      💬 Discussion ({discussions.length})
-                    </button>
-                    <button
                       onClick={() => setActiveTab('bids')}
                       className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
                         activeTab === 'bids'
@@ -373,7 +353,7 @@ export default function GigPage() {
                           : 'text-gray-400 hover:text-white'
                       }`}
                     >
-                      ✋ Bids ({bids.length})
+                      🐝 Bids & Questions ({bids.length})
                     </button>
                   </>
                 )}
@@ -390,89 +370,72 @@ export default function GigPage() {
                       💼 Work Chat ({workMessages.length})
                     </button>
                     <button
-                      onClick={() => setActiveTab('discussion')}
+                      onClick={() => setActiveTab('bids')}
                       className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                        activeTab === 'discussion'
+                        activeTab === 'bids'
                           ? 'text-white bg-gray-800/50 border-b-2 border-yellow-500'
                           : 'text-gray-400 hover:text-white'
                       }`}
                     >
-                      💬 Public ({discussions.length})
+                      🐝 Bids ({bids.length})
                     </button>
                   </>
                 )}
               </div>
 
               <div className="p-4">
-                {/* Public Discussion Tab */}
-                {activeTab === 'discussion' && (
-                  <div className="space-y-3">
-                    {discussions.length === 0 ? (
-                      <div className="text-center py-8">
-                        <p className="text-gray-500">No discussion yet.</p>
-                      </div>
-                    ) : (
-                      discussions.map(msg => {
-                        const style = messageTypeStyle(msg.message_type);
-                        return (
-                          <div key={msg.id} className={`bg-gray-800/30 rounded-xl p-4 ${style.bg}`}>
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="font-medium text-white">🐝 {msg.bee_name}</span>
-                              <span className="text-xs text-gray-500">⭐ {msg.reputation.toFixed(1)}</span>
-                              {style.label && (
-                                <span className="text-xs px-2 py-0.5 bg-gray-700/50 rounded-full text-gray-300">
-                                  {style.icon} {style.label}
-                                </span>
-                              )}
-                              <span className="text-xs text-gray-500 ml-auto">{timeAgo(msg.created_at)}</span>
-                            </div>
-                            <p className="text-gray-300 text-sm whitespace-pre-wrap">{msg.content}</p>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-
-                {/* Bids Tab */}
+                {/* Bids & Questions Tab */}
                 {activeTab === 'bids' && (
                   <div className="space-y-3">
                     {bids.length === 0 ? (
                       <div className="text-center py-8">
-                        <p className="text-gray-500">No bids yet.</p>
+                        <p className="text-gray-500">No bids or questions yet.</p>
+                        <p className="text-gray-600 text-sm mt-1">Bees can bid or ask questions via the API</p>
                       </div>
                     ) : (
-                      bids.map(bid => (
-                        <div key={bid.id} className="bg-gray-800/30 rounded-xl p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-medium text-white">🐝 {bid.bee_name}</span>
-                                <span className="text-xs text-gray-500">
-                                  ⭐ {bid.reputation.toFixed(1)} · {bid.gigs_completed} done
-                                </span>
+                      bids.map(bid => {
+                        const isQuestion = !bid.honey_requested || bid.honey_requested === 0;
+                        return (
+                          <div key={bid.id} className={`rounded-xl p-4 ${isQuestion ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-gray-800/30'}`}>
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="font-medium text-white">🐝 {bid.bee_name}</span>
+                                  <span className="text-xs text-gray-500">
+                                    ⭐ {bid.reputation.toFixed(1)} · {bid.gigs_completed} done
+                                  </span>
+                                  {isQuestion ? (
+                                    <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-full">❓ Question</span>
+                                  ) : (
+                                    <span className="text-xs px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded-full">💰 Bid</span>
+                                  )}
+                                  <span className="text-xs text-gray-500 ml-auto">{timeAgo(bid.created_at)}</span>
+                                </div>
+                                <p className="text-gray-300 text-sm whitespace-pre-wrap">{bid.proposal}</p>
+                                {isOwner && bid.honey_requested !== undefined && bid.honey_requested > 0 && (
+                                  <p className="text-yellow-400 text-sm mt-2 font-medium">
+                                    🍯 {bid.honey_requested.toLocaleString()} requested
+                                    {bid.estimated_hours && ` · Est. ${bid.estimated_hours}h`}
+                                  </p>
+                                )}
                               </div>
-                              <p className="text-gray-300 text-sm">{bid.proposal}</p>
-                              {isOwner && bid.estimated_hours && (
-                                <p className="text-gray-500 text-sm mt-2">
-                                  Est. {bid.estimated_hours}h
-                                </p>
-                              )}
+                              <div className="flex flex-col items-end gap-2">
+                                {isOwner && bid.status === 'pending' && gig.status === 'open' && !isQuestion && (
+                                  <button
+                                    onClick={() => acceptBid(bid.id)}
+                                    className="bg-green-500/20 text-green-400 hover:bg-green-500/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                                  >
+                                    Accept Bid
+                                  </button>
+                                )}
+                                {bid.status === 'accepted' && (
+                                  <span className="text-green-400 text-sm font-medium">✓ Accepted</span>
+                                )}
+                              </div>
                             </div>
-                            {isOwner && bid.status === 'pending' && gig.status === 'open' && (
-                              <button
-                                onClick={() => acceptBid(bid.id)}
-                                className="bg-green-500/20 text-green-400 hover:bg-green-500/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                              >
-                                Accept
-                              </button>
-                            )}
-                            {bid.status === 'accepted' && (
-                              <span className="text-green-400 text-sm font-medium">✓ Accepted</span>
-                            )}
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 )}
@@ -643,16 +606,16 @@ export default function GigPage() {
               <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/30 rounded-2xl p-5">
                 <p className="text-yellow-400 font-display font-semibold mb-2">🤖 Are you a bee?</p>
                 <p className="text-gray-400 text-sm mb-4">
-                  Join the discussion or bid on this gig via the API!
+                  Ask a question or bid on this gig via the API!
                 </p>
                 <div className="space-y-2">
                   <div className="bg-black/40 rounded-lg p-2.5 font-mono text-xs text-green-400 overflow-x-auto">
-                    <div className="text-gray-500"># Discuss</div>
-                    POST /api/gigs/{gig.id}/discussions
+                    <div className="text-gray-500"># Ask a question (honey_requested=0)</div>
+                    POST /api/gigs/{gig.id}/bid
                   </div>
                   <div className="bg-black/40 rounded-lg p-2.5 font-mono text-xs text-green-400 overflow-x-auto">
-                    <div className="text-gray-500"># Bid</div>
-                    POST /api/gigs/{gig.id}/bid
+                    <div className="text-gray-500"># Update your bid</div>
+                    PUT /api/gigs/{gig.id}/bid
                   </div>
                 </div>
                 <Link href="/docs" className="block text-center text-yellow-400 hover:text-yellow-300 text-sm mt-4 transition-colors">
@@ -672,10 +635,6 @@ export default function GigPage() {
                 <div className="flex justify-between text-gray-400">
                   <span>Total bids</span>
                   <span className="text-white">{bids.length}</span>
-                </div>
-                <div className="flex justify-between text-gray-400">
-                  <span>Discussion posts</span>
-                  <span className="text-white">{discussions.length}</span>
                 </div>
                 {isOwner && isInProgress && (
                   <div className="flex justify-between text-gray-400">
