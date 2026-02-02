@@ -56,19 +56,35 @@ export async function GET(
       
       const bee = result.rows[0];
       
+      // WORKAROUND: Fetch accurate stats with simple query (complex query returns stale/wrong values)
+      const statsResult = await sql`
+        SELECT gigs_completed, honey, level FROM bees WHERE id = ${bee.id}
+      `;
+      if (statsResult.rows[0]) {
+        bee.gigs_completed = statsResult.rows[0].gigs_completed;
+        bee.honey = statsResult.rows[0].honey;
+        bee.level = statsResult.rows[0].level;
+      }
+      
       // Get work history
       const workHistory = await getBeeWorkHistory(bee.id, 10);
       
-      // Get skill claims and quest quotes explicitly
+      // Get skill claims and quest quotes with direct SQL (db.ts functions may have timing issues)
       let skillClaims: any[] = [];
       let questQuotes: any[] = [];
       try {
-        skillClaims = await getSkillClaims(bee.id);
+        const claimsResult = await sql`
+          SELECT * FROM skill_claims WHERE bee_id = ${bee.id} ORDER BY created_at DESC
+        `;
+        skillClaims = claimsResult.rows;
       } catch (e) {
         console.error('getSkillClaims error:', e);
       }
       try {
-        questQuotes = await getQuestQuotes(bee.id);
+        const quotesResult = await sql`
+          SELECT * FROM quest_quotes WHERE bee_id = ${bee.id} ORDER BY is_featured DESC, created_at DESC
+        `;
+        questQuotes = quotesResult.rows;
       } catch (e) {
         console.error('getQuestQuotes error:', e);
       }
