@@ -300,6 +300,7 @@ export default function GigPage() {
   if (!gig) return null;
 
   const isInProgress = ['in_progress', 'review'].includes(gig.status);
+  const hasWorkHistory = ['in_progress', 'review', 'completed'].includes(gig.status);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-950 to-black">
@@ -388,7 +389,7 @@ export default function GigPage() {
                     </button>
                   </>
                 )}
-                {isInProgress && isOwner && (
+                {hasWorkHistory && isOwner && (
                   <>
                     <button
                       onClick={() => setActiveTab('work')}
@@ -472,7 +473,7 @@ export default function GigPage() {
                 )}
 
                 {/* Private Work Chat Tab */}
-                {activeTab === 'work' && isOwner && isInProgress && (
+                {activeTab === 'work' && isOwner && hasWorkHistory && (
                   <div>
                     <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
                       <p className="text-blue-400 text-sm">
