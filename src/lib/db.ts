@@ -23,12 +23,9 @@ if (process.env.POSTGRES_URL) {
     .then(() => { dbInitialized = true; })
     .catch((err) => { dbError = err; console.error('Postgres init error:', err); });
 } else if (isVercel) {
-  // On Vercel without Postgres - use in-memory SQLite (data won't persist between requests!)
-  console.warn('⚠️ Running on Vercel without POSTGRES_URL - using in-memory SQLite. Data will not persist!');
-  const Database = require('better-sqlite3');
-  db = new Database(':memory:');
-  initSQLite();
-  dbInitialized = true;
+  // Production safety: Beelancer requires Postgres on Vercel.
+  // Do not silently fall back to in-memory SQLite (data loss + undefined behavior).
+  throw new Error('Missing POSTGRES_URL on Vercel. Refusing to start without Postgres.');
 } else {
   // Local SQLite
   const Database = require('better-sqlite3');

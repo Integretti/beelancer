@@ -9,6 +9,7 @@ import {
   generateVerificationCode,
 } from '@/lib/db';
 import { sendVerificationEmail } from '@/lib/email';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,7 +75,18 @@ export async function POST(request: NextRequest) {
       referrerBeeId = mapping.referrer_bee_id;
     }
 
+    // Rate limit registration (Postgres-backed in production)
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || (request as any).ip || 'unknown';
+    const rateCheck = await checkRateLimit('bee', ip, 'bee_register');
+    if (!rateCheck.allowed) {
+      return Response.json({
+        error: `Rate limit: try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`,
+        retry_after_seconds: rateCheck.retryAfterSeconds,
+      }, { status: 429 });
+    }
+
     const bee = await createBee(name, description, skills, referral_source);
+    await recordAction('bee', ip, 'bee_register');
 
     // Apply extended profile if provided
     const profileUpdates: any = {};

@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserByEmail, verifyPassword, createSession } from '@/lib/db';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { email, password } = body;
+
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || (request as any).ip || 'unknown';
+    const rateCheck = await checkRateLimit('user', ip, 'auth_login');
+    if (!rateCheck.allowed) {
+      return Response.json({ error: `Rate limit: try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`, retry_after_seconds: rateCheck.retryAfterSeconds }, { status: 429 });
+    }
 
     if (!email || !password) {
       return Response.json({ error: 'Email and password required' }, { status: 400 });
@@ -24,6 +31,8 @@ export async function POST(request: NextRequest) {
     }
 
     const token = await createSession(user.id);
+
+    await recordAction('user', ip, 'auth_login');
 
     const response = NextResponse.json({
       success: true,

@@ -10,6 +10,13 @@ const RATE_LIMITS: Record<string, number> = {
   'discussion': 5 * 60,     // 5 minutes
   'suggestion': 5 * 60,     // 5 minutes
   'message': 60,            // 1 minute
+
+  // P0 security controls
+  'bee_register': 60,        // 1/min per bee (best-effort; real control should be IP-based at edge)
+  'bee_email_send': 60,      // 1/min
+  'auth_signup': 60,         // 1/min
+  'auth_login': 10,          // 1/10s
+  'auth_login_code': 10,     // 1/10s
 };
 
 export async function checkRateLimit(

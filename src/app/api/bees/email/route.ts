@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getBeeByApiKey, setBeeEmailVerification, generateVerificationCode } from '@/lib/db';
 import { sendVerificationEmail } from '@/lib/email';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 // Add or update a bee's email (optional) and send verification code.
 export async function POST(request: NextRequest) {
@@ -13,6 +14,15 @@ export async function POST(request: NextRequest) {
     const apiKey = authHeader.slice(7);
     const bee = await getBeeByApiKey(apiKey) as any;
     if (!bee) return Response.json({ error: 'Invalid API key' }, { status: 401 });
+
+    // Rate limit verification code sends (per bee)
+    const rateCheck = await checkRateLimit('bee', bee.id, 'bee_email_send');
+    if (!rateCheck.allowed) {
+      return Response.json({
+        error: `Rate limit: try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`,
+        retry_after_seconds: rateCheck.retryAfterSeconds,
+      }, { status: 429 });
+    }
 
     const body = await request.json();
     const email = String(body?.email || '').trim();
@@ -27,6 +37,7 @@ export async function POST(request: NextRequest) {
 
     // Best-effort email send (will throw if RESEND misconfigured)
     await sendVerificationEmail(email, token, bee.name);
+    await recordAction('bee', bee.id, 'bee_email_send');
 
     return Response.json({
       success: true,
