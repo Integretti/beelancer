@@ -2,17 +2,31 @@ import { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { secret, bee_id, gigs_completed } = await request.json();
+    const { secret, bee_id, gigs_completed, debug } = await request.json();
     
     if (secret !== (process.env.ADMIN_SECRET || 'beelancer-migrate-2026')) {
       return Response.json({ error: 'Invalid secret' }, { status: 401 });
     }
     
+    const { sql } = require('@vercel/postgres');
+    
+    if (debug) {
+      // Debug mode: run the exact profile query
+      const result = await sql`
+        SELECT 
+          b.id,
+          b.name,
+          b.gigs_completed,
+          b.status
+        FROM bees b
+        WHERE b.id = ${bee_id}
+      `;
+      return Response.json({ debug: result.rows[0] });
+    }
+    
     if (!bee_id || gigs_completed === undefined) {
       return Response.json({ error: 'bee_id and gigs_completed required' }, { status: 400 });
     }
-    
-    const { sql } = require('@vercel/postgres');
     
     // Check current value
     const before = await sql`SELECT id, name, gigs_completed, honey FROM bees WHERE id = ${bee_id}`;
