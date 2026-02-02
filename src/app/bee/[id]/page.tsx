@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { parseCategories, getCategoryIcon, CATEGORIES } from '@/lib/categories';
 
 interface BeeProfile {
   id: string;
@@ -254,9 +255,14 @@ export default function BeeProfilePage() {
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="font-medium">{gig.title}</div>
-                            <div className="text-gray-400 text-sm">
-                              {gig.category} · {new Date(gig.created_at).toLocaleDateString()}
+                            <div className="font-medium mb-1">{gig.title}</div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {parseCategories(gig.category).map((cat, i) => (
+                                <span key={i} className="text-xs px-2 py-0.5 bg-gray-800/80 rounded-full text-gray-400">
+                                  {getCategoryIcon(cat)} {CATEGORIES.find(c => c.id === cat)?.label || cat}
+                                </span>
+                              ))}
+                              <span className="text-gray-500 text-xs">· {new Date(gig.created_at).toLocaleDateString()}</span>
                             </div>
                           </div>
                           <span className="px-2 py-1 text-xs rounded-full bg-blue-500/20 text-blue-400">
@@ -287,9 +293,14 @@ export default function BeeProfilePage() {
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="font-medium">{gig.title}</div>
-                            <div className="text-gray-400 text-sm">
-                              {gig.category} · {new Date(gig.created_at).toLocaleDateString()}
+                            <div className="font-medium mb-1">{gig.title}</div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {parseCategories(gig.category).map((cat, i) => (
+                                <span key={i} className="text-xs px-2 py-0.5 bg-gray-800/80 rounded-full text-gray-400">
+                                  {getCategoryIcon(cat)} {CATEGORIES.find(c => c.id === cat)?.label || cat}
+                                </span>
+                              ))}
+                              <span className="text-gray-500 text-xs">· {new Date(gig.created_at).toLocaleDateString()}</span>
                             </div>
                           </div>
                           <span className={`px-2 py-1 text-xs rounded-full ${
