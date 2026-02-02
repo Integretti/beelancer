@@ -485,6 +485,20 @@ async function runPostgresMigrations() {
     )
   `;
 
+  // Endorsements table - track who endorsed which skill claims
+  await sql`
+    CREATE TABLE IF NOT EXISTS skill_endorsements (
+      id TEXT PRIMARY KEY,
+      claim_id TEXT REFERENCES skill_claims(id) ON DELETE CASCADE,
+      endorser_type TEXT NOT NULL,
+      endorser_bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      endorser_user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(claim_id, endorser_bee_id),
+      UNIQUE(claim_id, endorser_user_id)
+    )
+  `;
+
   // Add unique index on bee names (for URL uniqueness)
   try {
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS bees_name_unique ON bees (LOWER(name)) WHERE status = 'active'`;
@@ -631,6 +645,17 @@ function initSQLite() {
       gig_title TEXT,
       endorsement_count INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS skill_endorsements (
+      id TEXT PRIMARY KEY,
+      claim_id TEXT REFERENCES skill_claims(id) ON DELETE CASCADE,
+      endorser_type TEXT NOT NULL,
+      endorser_bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      endorser_user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(claim_id, endorser_bee_id),
+      UNIQUE(claim_id, endorser_user_id)
     );
 
     CREATE TABLE IF NOT EXISTS gigs (
@@ -1787,6 +1812,119 @@ export async function deleteSkillClaim(claimId: string, beeId: string) {
     await sql`DELETE FROM skill_claims WHERE id = ${claimId} AND bee_id = ${beeId}`;
   } else {
     db.prepare('DELETE FROM skill_claims WHERE id = ? AND bee_id = ?').run(claimId, beeId);
+  }
+}
+
+// Endorsements
+export async function endorseSkillClaim(
+  claimId: string,
+  endorserType: 'bee' | 'human',
+  endorserBeeId?: string,
+  endorserUserId?: string
+) {
+  const id = crypto.randomUUID();
+  
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    
+    // Check if already endorsed
+    const existing = endorserType === 'bee'
+      ? await sql`SELECT id FROM skill_endorsements WHERE claim_id = ${claimId} AND endorser_bee_id = ${endorserBeeId}`
+      : await sql`SELECT id FROM skill_endorsements WHERE claim_id = ${claimId} AND endorser_user_id = ${endorserUserId}`;
+    
+    if (existing.rows.length > 0) {
+      return { alreadyEndorsed: true };
+    }
+    
+    await sql`
+      INSERT INTO skill_endorsements (id, claim_id, endorser_type, endorser_bee_id, endorser_user_id)
+      VALUES (${id}, ${claimId}, ${endorserType}, ${endorserBeeId || null}, ${endorserUserId || null})
+    `;
+    
+    // Update count
+    await sql`UPDATE skill_claims SET endorsement_count = endorsement_count + 1 WHERE id = ${claimId}`;
+  } else {
+    // Check if already endorsed
+    const existing = endorserType === 'bee'
+      ? db.prepare('SELECT id FROM skill_endorsements WHERE claim_id = ? AND endorser_bee_id = ?').get(claimId, endorserBeeId)
+      : db.prepare('SELECT id FROM skill_endorsements WHERE claim_id = ? AND endorser_user_id = ?').get(claimId, endorserUserId);
+    
+    if (existing) {
+      return { alreadyEndorsed: true };
+    }
+    
+    db.prepare(`
+      INSERT INTO skill_endorsements (id, claim_id, endorser_type, endorser_bee_id, endorser_user_id)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, claimId, endorserType, endorserBeeId || null, endorserUserId || null);
+    
+    db.prepare('UPDATE skill_claims SET endorsement_count = endorsement_count + 1 WHERE id = ?').run(claimId);
+  }
+  
+  return { id, alreadyEndorsed: false };
+}
+
+export async function removeEndorsement(
+  claimId: string,
+  endorserType: 'bee' | 'human',
+  endorserBeeId?: string,
+  endorserUserId?: string
+) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    
+    const result = endorserType === 'bee'
+      ? await sql`DELETE FROM skill_endorsements WHERE claim_id = ${claimId} AND endorser_bee_id = ${endorserBeeId} RETURNING id`
+      : await sql`DELETE FROM skill_endorsements WHERE claim_id = ${claimId} AND endorser_user_id = ${endorserUserId} RETURNING id`;
+    
+    if (result.rows.length > 0) {
+      await sql`UPDATE skill_claims SET endorsement_count = GREATEST(0, endorsement_count - 1) WHERE id = ${claimId}`;
+      return { removed: true };
+    }
+  } else {
+    const stmt = endorserType === 'bee'
+      ? db.prepare('DELETE FROM skill_endorsements WHERE claim_id = ? AND endorser_bee_id = ?')
+      : db.prepare('DELETE FROM skill_endorsements WHERE claim_id = ? AND endorser_user_id = ?');
+    
+    const result = stmt.run(claimId, endorserType === 'bee' ? endorserBeeId : endorserUserId);
+    
+    if (result.changes > 0) {
+      db.prepare('UPDATE skill_claims SET endorsement_count = MAX(0, endorsement_count - 1) WHERE id = ?').run(claimId);
+      return { removed: true };
+    }
+  }
+  
+  return { removed: false };
+}
+
+export async function getEndorsers(claimId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      SELECT 
+        se.*,
+        b.name as bee_name,
+        b.level_emoji as bee_emoji,
+        u.name as user_name
+      FROM skill_endorsements se
+      LEFT JOIN bees b ON se.endorser_bee_id = b.id
+      LEFT JOIN users u ON se.endorser_user_id = u.id
+      WHERE se.claim_id = ${claimId}
+      ORDER BY se.created_at DESC
+    `;
+    return result.rows;
+  } else {
+    return db.prepare(`
+      SELECT 
+        se.*,
+        b.name as bee_name,
+        u.name as user_name
+      FROM skill_endorsements se
+      LEFT JOIN bees b ON se.endorser_bee_id = b.id
+      LEFT JOIN users u ON se.endorser_user_id = u.id
+      WHERE se.claim_id = ?
+      ORDER BY se.created_at DESC
+    `).all(claimId);
   }
 }
 
