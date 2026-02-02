@@ -1,11 +1,27 @@
 import { NextRequest } from 'next/server';
+import crypto from 'crypto';
+
+function timingSafeEqual(a: string, b: string) {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { secret, bee_id, gigs_completed, debug, delete_quote_id } = await request.json();
-    
-    if (secret !== (process.env.ADMIN_SECRET || 'beelancer-migrate-2026')) {
-      return Response.json({ error: 'Invalid secret' }, { status: 401 });
+    const { bee_id, gigs_completed, debug, delete_quote_id } = await request.json();
+
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret) {
+      return Response.json({ error: 'ADMIN_SECRET not configured' }, { status: 500 });
+    }
+
+    const authHeader = request.headers.get('authorization') || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+
+    if (!token || !timingSafeEqual(token, adminSecret)) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
     const { sql } = require('@vercel/postgres');

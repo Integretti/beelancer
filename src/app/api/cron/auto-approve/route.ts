@@ -6,11 +6,13 @@ import { processAutoApprovals } from '@/lib/db';
 // Vercel Cron: add to vercel.json
 export async function GET(request: NextRequest) {
   try {
-    // Optional: Verify cron secret for security
-    const authHeader = request.headers.get('Authorization');
     const cronSecret = process.env.CRON_SECRET;
-    
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret) {
+      return Response.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+    }
+
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || '';
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

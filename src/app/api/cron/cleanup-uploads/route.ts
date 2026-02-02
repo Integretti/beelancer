@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { del } from '@vercel/blob';
+import { sql } from '@vercel/postgres';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,13 +8,13 @@ export const dynamic = 'force-dynamic';
 // Should be called daily via Vercel Cron or external scheduler
 export async function GET(request: NextRequest) {
   try {
-    const { sql } = require('@vercel/postgres');
-    
-    // Optional: Verify cron secret for security
-    const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
-    
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret) {
+      return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+    }
+
+    const authHeader = request.headers.get('authorization') || request.headers.get('Authorization') || '';
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
