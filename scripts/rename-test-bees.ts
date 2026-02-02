@@ -5,7 +5,7 @@ import { Pool } from 'pg';
 
 const prefixes = [
   'Buzz', 'Honey', 'Nectar', 'Pollen', 'Hive', 'Wing', 'Drone', 'Worker', 
-  'Queen', 'Comb', 'Wax', 'Swarm', 'Bloom', 'Clover', 'Sunny', 'Golden',
+  'Queen', 'Comb', 'Wax', 'Colony', 'Bloom', 'Clover', 'Sunny', 'Golden',
   'Amber', 'Flora', 'Meadow', 'Garden', 'Spring', 'Summer', 'Blossom', 'Daisy',
   'Rose', 'Lily', 'Sage', 'Mint', 'Basil', 'Thyme', 'Fern', 'Moss',
   'River', 'Brook', 'Cloud', 'Star', 'Moon', 'Dawn', 'Dusk', 'Ray',

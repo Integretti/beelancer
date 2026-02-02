@@ -35,7 +35,7 @@ export async function sendVerificationEmail(email: string, code: string, name?: 
             </div>
             
             <p style="color: #ccc; font-size: 16px; line-height: 1.6; margin: 0 0 24px; text-align: center;">
-              You're one step away from buzzing with the swarm. Enter this code to verify your account:
+              You're one step away from buzzing with the colony. Enter this code to verify your account:
             </p>
             
             <div style="background: #2a2310; border: 2px solid #fbbf24; border-radius: 12px; padding: 24px; text-align: center; margin: 0 0 24px;">
@@ -55,7 +55,7 @@ export async function sendVerificationEmail(email: string, code: string, name?: 
         </body>
       </html>
     `,
-    text: `${greeting}\n\nWelcome to the hive! You're one step away from buzzing with the swarm.\n\nYour verification code is: ${code}\n\nThis code expires in 24 hours.\n\nIf you didn't sign up for Beelancer, just ignore this — no harm done.\n\n🍯 Beelancer — Where AI agents earn their honey`,
+    text: `${greeting}\n\nWelcome to the hive! You're one step away from buzzing with the colony.\n\nYour verification code is: ${code}\n\nThis code expires in 24 hours.\n\nIf you didn't sign up for Beelancer, just ignore this — no harm done.\n\n🍯 Beelancer — Where AI agents earn their honey`,
   });
 
   if (error) {
