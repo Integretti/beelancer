@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { getGigById, getSessionUser, getBeeByApiKey, createWorkMessage, getWorkMessages, isAssignedToGig } from '@/lib/db';
+import { getGigById, getSessionUser, createWorkMessage, getWorkMessages } from '@/lib/db';
 
-// GET - Get private work messages (only for gig owner or assigned bees)
+// GET - Get private work messages (only for gig owner / beekeeper)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -14,19 +14,14 @@ export async function GET(
       return Response.json({ error: 'Gig not found' }, { status: 404 });
     }
 
-    // Check if requester is authorized (gig owner or assigned bee)
+    // Check if requester is the gig owner (beekeepers only - bees use deliverables for communication)
     const token = request.cookies.get('session')?.value;
     const session = token ? await getSessionUser(token) : null;
-    
-    const authHeader = request.headers.get('authorization');
-    const apiKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    const bee = apiKey ? await getBeeByApiKey(apiKey) : null;
 
     const isOwner = session?.user_id === gig.user_id;
-    const isAssigned = bee ? await isAssignedToGig(id, bee.id) : false;
 
-    if (!isOwner && !isAssigned) {
-      return Response.json({ error: 'Only the gig owner and assigned bees can view work messages' }, { status: 403 });
+    if (!isOwner) {
+      return Response.json({ error: 'Only the gig owner can view work messages' }, { status: 403 });
     }
 
     const messages = await getWorkMessages(id);
@@ -50,7 +45,7 @@ export async function GET(
   }
 }
 
-// POST - Send a work message (only for gig owner or assigned bees)
+// POST - Send a work message (only for gig owner / beekeeper)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -73,19 +68,14 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // Check if requester is authorized
+    // Check if requester is the gig owner (beekeepers only)
     const token = request.cookies.get('session')?.value;
     const session = token ? await getSessionUser(token) : null;
-    
-    const authHeader = request.headers.get('authorization');
-    const apiKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    const bee = apiKey ? await getBeeByApiKey(apiKey) : null;
 
     const isOwner = session?.user_id === gig.user_id;
-    const isAssigned = bee ? await isAssignedToGig(id, bee.id) : false;
 
-    if (!isOwner && !isAssigned) {
-      return Response.json({ error: 'Only the gig owner and assigned bees can send work messages' }, { status: 403 });
+    if (!isOwner) {
+      return Response.json({ error: 'Only the gig owner can send work messages' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -95,27 +85,13 @@ export async function POST(
       return Response.json({ error: 'Message content or attachment required' }, { status: 400 });
     }
 
-    // Determine sender type and ID
-    let senderType: 'human' | 'bee';
-    let senderId: string;
-
-    if (isOwner && session) {
-      senderType = 'human';
-      senderId = session.user_id;
-    } else if (bee) {
-      senderType = 'bee';
-      senderId = bee.id;
-    } else {
-      return Response.json({ error: 'Could not determine sender' }, { status: 400 });
-    }
-
-    const message = await createWorkMessage(id, senderType, senderId, content?.trim() || '', attachment_url);
+    const message = await createWorkMessage(id, 'human', session.user_id, content?.trim() || '', attachment_url);
 
     return Response.json({ 
       success: true, 
       message: {
         id: message.id,
-        sender_type: senderType,
+        sender_type: 'human',
         content: content?.trim() || '',
         attachment_url,
       }
