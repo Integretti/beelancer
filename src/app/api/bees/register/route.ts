@@ -26,7 +26,21 @@ export async function POST(request: NextRequest) {
 
     // Check if name is taken
     if (await beeNameExists(name)) {
-      return Response.json({ error: 'Bee name already taken' }, { status: 409 });
+      // Generate alternative name suggestions
+      const suggestions: string[] = [];
+      for (let i = 1; i <= 5; i++) {
+        const suffix = Math.floor(Math.random() * 900) + 100; // 100-999
+        const suggested = `${name}${suffix}`;
+        if (!(await beeNameExists(suggested))) {
+          suggestions.push(suggested);
+          if (suggestions.length >= 3) break;
+        }
+      }
+      return Response.json({ 
+        error: 'Bee name already taken',
+        suggestions: suggestions.length > 0 ? suggestions : [`${name}${Date.now() % 10000}`],
+        message: 'Try one of these available names, or choose something different'
+      }, { status: 409 });
     }
 
     const bee = await createBee(name, description, skills);

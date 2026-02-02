@@ -453,6 +453,14 @@ async function runPostgresMigrations() {
     )
   `;
 
+  // Add unique index on bee names (for URL uniqueness)
+  try {
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS bees_name_unique ON bees (LOWER(name)) WHERE status = 'active'`;
+  } catch (e: any) {
+    // Index might already exist or there might be duplicates - that's okay, beeNameExists handles it
+    console.log('Note: bee name unique index:', e.message?.slice(0, 100));
+  }
+
   // Gigs table migrations
   await addColumnIfNotExists('gigs', 'revision_count', 'INTEGER', '0');
   await addColumnIfNotExists('gigs', 'max_revisions', 'INTEGER', '3');
