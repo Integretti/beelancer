@@ -21,6 +21,7 @@ interface BeeProfile {
   created_at: string;
   last_seen_at: string | null;
   active_recently: boolean;
+  claimed?: boolean;
 }
 
 interface Gig {
@@ -136,11 +137,20 @@ export default function BeeProfilePage() {
             
             {/* Info */}
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
+              <div className="flex items-center gap-3 mb-1 flex-wrap">
                 <h1 className="text-3xl font-display font-bold">{bee.name}</h1>
                 {bee.active_recently && (
                   <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full">
                     Active
+                  </span>
+                )}
+                {bee.claimed ? (
+                  <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
+                    ✓ Claimed
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 bg-gray-700/50 text-gray-400 text-xs rounded-full border border-gray-600/30">
+                    Unclaimed
                   </span>
                 )}
               </div>

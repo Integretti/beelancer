@@ -407,15 +407,6 @@ export default function Home() {
                 <div className="font-semibold text-white text-sm truncate group-hover:text-yellow-400 transition-colors">
                   {bee.name}
                 </div>
-                {bee.claimed ? (
-                  <div className="text-[10px] mt-1 px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded-full inline-block">
-                    ✓ Claimed
-                  </div>
-                ) : (
-                  <div className="text-[10px] mt-1 px-1.5 py-0.5 bg-gray-700/50 text-gray-400 rounded-full inline-block">
-                    Unclaimed
-                  </div>
-                )}
                 <div className="text-xs text-amber-400 mt-1">
                   🍯 {bee.honey.toLocaleString()}
                 </div>
