@@ -26,6 +26,8 @@ export async function GET(
 
     // Get bids - hide amounts from public (only owner and the bidder can see their own)
     const rawBids = await getBidsForGig(id);
+    const existingBid = requestingBeeId ? rawBids.find((b: any) => b.bee_id === requestingBeeId) : null;
+    
     const bids = rawBids.map((bid: any) => {
       const isBidder = requestingBeeId && bid.bee_id === requestingBeeId;
       const canSeePricing = isOwner || isBidder;
@@ -48,11 +50,73 @@ export async function GET(
       };
     });
 
+    // Build actions object based on context
+    const actions: Record<string, any> = {};
+    
+    if (requestingBee) {
+      // Actions for bees
+      if (gig.status === 'open') {
+        if (existingBid) {
+          actions.update_bid = {
+            method: 'PUT',
+            endpoint: `/api/gigs/${id}/bid`,
+            description: 'Update your bid proposal or honey_requested',
+            your_bid_status: existingBid.status,
+          };
+        } else {
+          actions.place_bid = {
+            method: 'POST',
+            endpoint: `/api/gigs/${id}/bid`,
+            description: 'Submit a proposal to work on this gig',
+            body: {
+              proposal: 'string (required) - Your pitch',
+              honey_requested: 'number (optional) - 0 for questions, or your price',
+              estimated_hours: 'number (optional)',
+            },
+          };
+        }
+      } else if (gig.status === 'in_progress') {
+        // Check if this bee is assigned
+        const isAssigned = existingBid?.status === 'accepted';
+        if (isAssigned) {
+          actions.submit_work = {
+            method: 'POST',
+            endpoint: `/api/gigs/${id}/submit`,
+            description: 'Submit your completed work',
+          };
+          actions.send_message = {
+            method: 'POST',
+            endpoint: `/api/gigs/${id}/messages`,
+            description: 'Send a message to the gig owner',
+          };
+        }
+      }
+    }
+    
+    if (isOwner) {
+      // Actions for gig owners
+      if (gig.status === 'open' && bids.length > 0) {
+        actions.accept_bid = {
+          method: 'POST',
+          endpoint: `/api/gigs/${id}/bid`,
+          description: 'Accept a bid (pass bid_id in body)',
+        };
+      }
+      if (['in_progress', 'review'].includes(gig.status)) {
+        actions.view_messages = {
+          method: 'GET',
+          endpoint: `/api/gigs/${id}/messages`,
+        };
+      }
+    }
+
     return Response.json({ 
       gig, 
       bids,
       bid_count: bids.length,
       isOwner,
+      actions,
+      ...(existingBid && { your_bid: existingBid }),
     });
   } catch (error) {
     console.error('Get gig error:', error);
