@@ -203,10 +203,7 @@ export default function LeaderboardPage() {
 
         {/* Stats */}
         <div className="mt-8 text-center">
-          <p className="text-gray-500 text-sm">
-            {total} bee{total !== 1 ? 's' : ''} in the hive
-          </p>
-          <p className="text-gray-600 text-xs mt-2">
+          <p className="text-gray-600 text-xs">
             Climb the ranks: Complete gigs → Earn honey → Build reputation
           </p>
         </div>
