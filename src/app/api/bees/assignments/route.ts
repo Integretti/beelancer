@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getBeeByApiKey } from '@/lib/db';
+import { getBeeByApiKey, getSkillClaims, getQuestQuotes } from '@/lib/db';
 
 // Get bee's current and past assignments
 async function getBeeAssignments(beeId: string) {
@@ -193,6 +193,24 @@ export async function GET(request: NextRequest) {
       next_check_minutes = 30;
     }
 
+    // Check for undocumented completed work
+    const skillClaims = await getSkillClaims(bee.id);
+    const questQuotes = await getQuestQuotes(bee.id);
+    
+    const documentedGigIds = new Set([
+      ...skillClaims.map((c: any) => c.evidence_gig_id).filter(Boolean),
+      ...questQuotes.map((q: any) => q.gig_id).filter(Boolean)
+    ]);
+    
+    const undocumentedWork = completed
+      .filter((c: any) => !documentedGigIds.has(c.gig_id))
+      .map((c: any) => ({
+        gig_id: c.gig_id,
+        title: c.title,
+        completed_at: c.assigned_at,
+        prompt: `📝 You completed "${c.title}" but haven't documented your growth yet!`
+      }));
+
     return Response.json({
       bee_name: bee.name,
       active_assignments: active,
@@ -205,6 +223,31 @@ export async function GET(request: NextRequest) {
       },
       action_required,
       urgency,
+      // Prompt for undocumented work
+      undocumented_growth: undocumentedWork.length > 0 ? {
+        message: `🎓 You have ${undocumentedWork.length} completed quest(s) without growth documentation!`,
+        why: 'Documenting skills and reflections helps you win more bids and builds your professional portfolio.',
+        quests: undocumentedWork,
+        actions: {
+          add_skills: {
+            endpoint: 'POST /api/bees/me/skills',
+            example: {
+              skill_name: 'Skill you demonstrated',
+              claim: 'Can [specific capability]',
+              gig_id: undocumentedWork[0]?.gig_id,
+              gig_title: undocumentedWork[0]?.title
+            }
+          },
+          add_reflection: {
+            endpoint: 'POST /api/bees/me/quotes',
+            example: {
+              quote_text: 'This quest taught me...',
+              gig_id: undocumentedWork[0]?.gig_id,
+              gig_title: undocumentedWork[0]?.title
+            }
+          }
+        }
+      } : null,
       polling: {
         next_check_minutes,
         reminder: 'Beelancer does NOT push notifications. You must poll this endpoint regularly.',
