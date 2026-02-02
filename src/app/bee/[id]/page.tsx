@@ -25,6 +25,83 @@ interface BeeProfile {
   owner_name?: string | null;
 }
 
+// Level progression config
+const LEVEL_CONFIG: Record<string, { next: string | null; gigsRequired: number; label: string }> = {
+  new: { next: 'worker', gigsRequired: 3, label: 'New Bee' },
+  worker: { next: 'expert', gigsRequired: 10, label: 'Worker Bee' },
+  expert: { next: 'queen', gigsRequired: 50, label: 'Expert Bee' },
+  queen: { next: null, gigsRequired: 0, label: 'Queen Bee' },
+};
+
+function LevelProgressBar({ level, gigsCompleted }: { level: string; gigsCompleted: number }) {
+  const config = LEVEL_CONFIG[level] || LEVEL_CONFIG.new;
+  const nextConfig = config.next ? LEVEL_CONFIG[config.next] : null;
+  
+  if (!config.next) {
+    // Max level
+    return (
+      <div className="mt-4 bg-gray-900/50 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-yellow-400 font-medium">👑 Max Level Reached</span>
+          <span className="text-gray-400 text-sm">{config.label}</span>
+        </div>
+        <div className="h-2 bg-yellow-500/30 rounded-full overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 w-full" />
+        </div>
+      </div>
+    );
+  }
+  
+  const prevRequired = config === LEVEL_CONFIG.new ? 0 : 
+    config === LEVEL_CONFIG.worker ? 3 : 
+    config === LEVEL_CONFIG.expert ? 10 : 0;
+  
+  const progress = Math.min(100, ((gigsCompleted - prevRequired) / (config.gigsRequired - prevRequired)) * 100);
+  const gigsToNext = Math.max(0, config.gigsRequired - gigsCompleted);
+  
+  return (
+    <div className="mt-4 bg-gray-900/50 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-gray-300 font-medium">{config.label}</span>
+        <span className="text-gray-400 text-sm">
+          {gigsToNext > 0 ? `${gigsToNext} gigs to ${nextConfig?.label}` : `Ready for ${nextConfig?.label}!`}
+        </span>
+      </div>
+      <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+        <div 
+          className="h-full bg-gradient-to-r from-yellow-400 to-amber-500 transition-all duration-500"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <div className="flex justify-between mt-1 text-xs text-gray-500">
+        <span>{gigsCompleted} gigs</span>
+        <span>{config.gigsRequired} needed</span>
+      </div>
+    </div>
+  );
+}
+
+function ReputationTrend({ reputation, gigsCompleted }: { reputation: string | null; gigsCompleted: number }) {
+  // Estimate trend based on activity (in real impl, track historical data)
+  const repNum = parseInt(reputation || '0') || 0;
+  const trend = gigsCompleted > 0 ? Math.min(gigsCompleted * 15, 100) : 0; // Rough estimate
+  const isPositive = trend > 0;
+  
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-2xl font-bold text-purple-400">{repNum || '—'}</span>
+      {isPositive && (
+        <span className="text-green-400 text-sm flex items-center">
+          <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clipRule="evenodd" />
+          </svg>
+          +{trend}
+        </span>
+      )}
+    </div>
+  );
+}
+
 interface Gig {
   id: string;
   title: string;
@@ -202,10 +279,13 @@ export default function BeeProfilePage() {
               <div className="text-gray-400 text-sm">Gigs Done</div>
             </div>
             <div className="bg-gray-900/50 rounded-xl p-4 text-center">
-              <div className="text-2xl font-bold text-purple-400">{bee.reputation || '—'}</div>
+              <ReputationTrend reputation={bee.reputation} gigsCompleted={bee.gigs_completed} />
               <div className="text-gray-400 text-sm">Reputation</div>
             </div>
           </div>
+          
+          {/* Level Progress */}
+          <LevelProgressBar level={bee.level} gigsCompleted={bee.gigs_completed} />
         </div>
       </div>
       
