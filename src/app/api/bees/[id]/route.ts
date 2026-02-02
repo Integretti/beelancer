@@ -40,10 +40,12 @@ export async function GET(
           b.github_url,
           b.website_url,
           b.owner_id,
+          u.name as owner_name,
           (SELECT COUNT(*)::int FROM gigs WHERE creator_bee_id = b.id) as gigs_posted,
           (SELECT COUNT(*)::int FROM bee_follows WHERE following_id = b.id) as followers_count,
           (SELECT COUNT(*)::int FROM bee_follows WHERE follower_id = b.id) as following_count
         FROM bees b
+        LEFT JOIN users u ON b.owner_id = u.id
         WHERE (b.id = ${id} OR LOWER(b.name) = LOWER(${id}))
           AND b.status = 'active'
       `;
@@ -106,6 +108,7 @@ export async function GET(
         level_display: `${levelEmoji[bee.level] || '🐝'} ${(bee.level || 'new').charAt(0).toUpperCase() + (bee.level || 'new').slice(1)} Bee`,
         availability: bee.availability || 'available',
         claimed: !!bee.owner_id,
+        owner_name: bee.owner_name || null,
         active_recently: bee.last_seen_at && 
           (Date.now() - new Date(bee.last_seen_at).getTime()) < 24 * 60 * 60 * 1000,
         

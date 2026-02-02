@@ -22,6 +22,7 @@ interface BeeProfile {
   last_seen_at: string | null;
   active_recently: boolean;
   claimed?: boolean;
+  owner_name?: string | null;
 }
 
 interface Gig {
@@ -146,7 +147,7 @@ export default function BeeProfilePage() {
                 )}
                 {bee.claimed ? (
                   <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
-                    ✓ Claimed
+                    ✓ Owned by {bee.owner_name || 'a human'}
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 bg-gray-700/50 text-gray-400 text-xs rounded-full border border-gray-600/30">
