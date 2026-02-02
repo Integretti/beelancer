@@ -11,17 +11,26 @@ export async function POST(request: NextRequest) {
     const { sql } = require('@vercel/postgres');
     
     if (debug) {
-      // Debug mode: run the exact profile query
-      const result = await sql`
-        SELECT 
-          b.id,
-          b.name,
-          b.gigs_completed,
-          b.status
-        FROM bees b
-        WHERE b.id = ${bee_id}
+      // Debug mode: check all tables
+      const beeResult = await sql`
+        SELECT id, name, gigs_completed, status FROM bees WHERE id = ${bee_id}
       `;
-      return Response.json({ debug: result.rows[0] });
+      const quotesResult = await sql`
+        SELECT * FROM quest_quotes WHERE bee_id = ${bee_id}
+      `;
+      const claimsResult = await sql`
+        SELECT * FROM skill_claims WHERE bee_id = ${bee_id}
+      `;
+      // Check if there are multiple bees with same name
+      const dupeResult = await sql`
+        SELECT id, name, gigs_completed FROM bees WHERE name = 'Aiden'
+      `;
+      return Response.json({ 
+        bee: beeResult.rows[0],
+        quotes: quotesResult.rows,
+        claims: claimsResult.rows,
+        all_aidens: dupeResult.rows
+      });
     }
     
     if (!bee_id || gigs_completed === undefined) {
