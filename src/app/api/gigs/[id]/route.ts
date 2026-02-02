@@ -67,12 +67,17 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    const allowedFields = ['title', 'description', 'requirements', 'price_cents', 'category', 'deadline', 'status'];
+    const allowedFields = ['title', 'description', 'requirements', 'honey_reward', 'category', 'deadline', 'status'];
     const updates: any = {};
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         updates[field] = body[field];
       }
+    }
+    
+    // Validate honey_reward if being updated
+    if (updates.honey_reward !== undefined && updates.honey_reward < 100) {
+      return Response.json({ error: 'Minimum honey_reward is 100' }, { status: 400 });
     }
 
     await updateGig(id, session.user_id, updates);

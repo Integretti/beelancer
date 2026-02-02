@@ -61,6 +61,7 @@ async function initPostgres() {
       bee_rating_count INTEGER DEFAULT 0,
       total_spent_cents INTEGER DEFAULT 0,
       disputes_as_client INTEGER DEFAULT 0,
+      honey INTEGER DEFAULT 1000,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
@@ -129,17 +130,17 @@ async function initPostgres() {
     )
   `;
 
-  // Gigs table with revision tracking and bot-to-bot support
+  // Gigs table with revision tracking
   await sql`
     CREATE TABLE IF NOT EXISTS gigs (
       id TEXT PRIMARY KEY,
       user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
       creator_type TEXT DEFAULT 'human',
-      creator_bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
       title TEXT NOT NULL,
       description TEXT,
       requirements TEXT,
       price_cents INTEGER DEFAULT 0,
+      honey_reward INTEGER DEFAULT 0,
       status TEXT DEFAULT 'draft',
       category TEXT,
       deadline TIMESTAMP,
@@ -226,13 +227,14 @@ async function initPostgres() {
     )
   `;
 
-  // Escrow system
+  // Escrow system (honey-based)
   await sql`
     CREATE TABLE IF NOT EXISTS escrow (
       id TEXT PRIMARY KEY,
       gig_id TEXT REFERENCES gigs(id) ON DELETE CASCADE,
       user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-      amount_cents INTEGER NOT NULL,
+      amount_cents INTEGER DEFAULT 0,
+      honey_amount INTEGER DEFAULT 0,
       status TEXT DEFAULT 'held',
       held_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       released_at TIMESTAMP,
@@ -478,6 +480,29 @@ async function runPostgresMigrations() {
   await addColumnIfNotExists('users', 'last_code_sent_at', 'TIMESTAMP');
   await addColumnIfNotExists('users', 'login_code', 'TEXT');
   await addColumnIfNotExists('users', 'login_code_expires', 'TIMESTAMP');
+
+  // Honey economy for users (all humans start with 1000 honey)
+  await addColumnIfNotExists('users', 'honey', 'INTEGER', '1000');
+  
+  // Gigs: honey_reward replaces price_cents for the honey economy
+  await addColumnIfNotExists('gigs', 'honey_reward', 'INTEGER', '0');
+  
+  // Escrow: honey_amount for the honey economy
+  await addColumnIfNotExists('escrow', 'honey_amount', 'INTEGER', '0');
+
+  // Migrate existing users to have 1000 honey if they have 0
+  try {
+    await sql`UPDATE users SET honey = 1000 WHERE honey IS NULL OR honey = 0`;
+  } catch (e: any) {
+    console.log('Note: user honey migration:', e.message?.slice(0, 100));
+  }
+
+  // Migrate existing gigs: set honey_reward from price_cents if not set (1 cent = 1 honey)
+  try {
+    await sql`UPDATE gigs SET honey_reward = GREATEST(price_cents, 100) WHERE honey_reward IS NULL OR honey_reward = 0`;
+  } catch (e: any) {
+    console.log('Note: gig honey migration:', e.message?.slice(0, 100));
+  }
 }
 
 function initSQLite() {
@@ -499,6 +524,7 @@ function initSQLite() {
       bee_rating_count INTEGER DEFAULT 0,
       total_spent_cents INTEGER DEFAULT 0,
       disputes_as_client INTEGER DEFAULT 0,
+      honey INTEGER DEFAULT 1000,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
@@ -562,11 +588,11 @@ function initSQLite() {
       id TEXT PRIMARY KEY,
       user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
       creator_type TEXT DEFAULT 'human',
-      creator_bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
       title TEXT NOT NULL,
       description TEXT,
       requirements TEXT,
       price_cents INTEGER DEFAULT 0,
+      honey_reward INTEGER DEFAULT 0,
       status TEXT DEFAULT 'draft',
       category TEXT,
       deadline TEXT,
@@ -643,7 +669,8 @@ function initSQLite() {
       id TEXT PRIMARY KEY,
       gig_id TEXT REFERENCES gigs(id) ON DELETE CASCADE,
       user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-      amount_cents INTEGER NOT NULL,
+      amount_cents INTEGER DEFAULT 0,
+      honey_amount INTEGER DEFAULT 0,
       status TEXT DEFAULT 'held',
       held_at TEXT DEFAULT CURRENT_TIMESTAMP,
       released_at TEXT,
@@ -1809,23 +1836,76 @@ export async function updateWorkHistoryWithReview(gigId: string, rating: number,
   }
 }
 
-// Only humans can create gigs
-export async function createGig(userId: string, data: { title: string; description?: string; requirements?: string; price_cents?: number; category?: string; deadline?: string; status?: string }) {
+// Get user's honey balance
+export async function getUserHoney(userId: string): Promise<number> {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`SELECT honey FROM users WHERE id = ${userId}`;
+    return result.rows[0]?.honey || 0;
+  } else {
+    const user = db.prepare('SELECT honey FROM users WHERE id = ?').get(userId) as any;
+    return user?.honey || 0;
+  }
+}
+
+// Deduct honey from user (for escrow)
+export async function deductUserHoney(userId: string, amount: number): Promise<boolean> {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      UPDATE users SET honey = honey - ${amount} 
+      WHERE id = ${userId} AND honey >= ${amount}
+      RETURNING honey
+    `;
+    return result.rows.length > 0;
+  } else {
+    const result = db.prepare(`
+      UPDATE users SET honey = honey - ? 
+      WHERE id = ? AND honey >= ?
+    `).run(amount, userId, amount);
+    return result.changes > 0;
+  }
+}
+
+// Add honey to user (refund)
+export async function addUserHoney(userId: string, amount: number): Promise<void> {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`UPDATE users SET honey = honey + ${amount} WHERE id = ${userId}`;
+  } else {
+    db.prepare('UPDATE users SET honey = honey + ? WHERE id = ?').run(amount, userId);
+  }
+}
+
+// Only humans can create gigs - now uses honey_reward
+export async function createGig(userId: string, data: { title: string; description?: string; requirements?: string; honey_reward: number; category?: string; deadline?: string; status?: string }) {
+  // Validate minimum honey reward
+  const honeyReward = data.honey_reward || 0;
+  if (honeyReward < 100) {
+    throw new Error('Minimum honey reward is 100');
+  }
+
+  // Validate user has enough honey
+  const userHoney = await getUserHoney(userId);
+  if (userHoney < honeyReward) {
+    throw new Error(`Insufficient honey. You have ${userHoney} but need ${honeyReward}`);
+  }
+
   const id = uuidv4();
-  const status = data.status || 'open'; // Default to 'open' (publish), not 'draft'
+  const status = data.status || 'open';
 
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
     await sql`
-      INSERT INTO gigs (id, user_id, creator_type, title, description, requirements, price_cents, category, deadline, status)
-      VALUES (${id}, ${userId}, 'human', ${data.title}, ${data.description || null}, ${data.requirements || null}, ${data.price_cents || 0}, ${data.category || null}, ${data.deadline || null}, ${status})
+      INSERT INTO gigs (id, user_id, creator_type, title, description, requirements, honey_reward, category, deadline, status)
+      VALUES (${id}, ${userId}, 'human', ${data.title}, ${data.description || null}, ${data.requirements || null}, ${honeyReward}, ${data.category || null}, ${data.deadline || null}, ${status})
     `;
     await sql`UPDATE users SET total_gigs_posted = total_gigs_posted + 1 WHERE id = ${userId}`;
   } else {
     db.prepare(`
-      INSERT INTO gigs (id, user_id, creator_type, title, description, requirements, price_cents, category, deadline, status)
+      INSERT INTO gigs (id, user_id, creator_type, title, description, requirements, honey_reward, category, deadline, status)
       VALUES (?, ?, 'human', ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, userId, data.title, data.description || null, data.requirements || null, data.price_cents || 0, data.category || null, data.deadline || null, status);
+    `).run(id, userId, data.title, data.description || null, data.requirements || null, honeyReward, data.category || null, data.deadline || null, status);
     db.prepare('UPDATE users SET total_gigs_posted = total_gigs_posted + 1 WHERE id = ?').run(userId);
   }
 
@@ -2109,59 +2189,132 @@ export async function getEscrowByGig(gigId: string) {
   }
 }
 
-export async function releaseEscrow(gigId: string, beeId: string) {
+// Release escrow and transfer honey to bee (with 10% platform fee)
+export async function releaseEscrow(gigId: string, beeId: string): Promise<{ honeyReleased: number; platformFee: number }> {
+  const PLATFORM_FEE_PERCENT = 10;
+  
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
+    
+    // Get escrow amount
+    const escrowResult = await sql`SELECT honey_amount FROM escrow WHERE gig_id = ${gigId} AND status = 'held'`;
+    const honeyAmount = escrowResult.rows[0]?.honey_amount || 0;
+    
+    // Calculate platform fee (10%)
+    const platformFee = Math.floor(honeyAmount * PLATFORM_FEE_PERCENT / 100);
+    const honeyToBee = honeyAmount - platformFee;
+    
+    // Update escrow status
     await sql`
       UPDATE escrow 
       SET status = 'released', released_at = NOW(), released_to_bee_id = ${beeId}
       WHERE gig_id = ${gigId} AND status = 'held'
     `;
+    
+    // Transfer honey to bee
+    await sql`UPDATE bees SET honey = honey + ${honeyToBee} WHERE id = ${beeId}`;
+    
+    return { honeyReleased: honeyToBee, platformFee };
   } else {
+    // Get escrow amount
+    const escrow = db.prepare('SELECT honey_amount FROM escrow WHERE gig_id = ? AND status = ?').get(gigId, 'held') as any;
+    const honeyAmount = escrow?.honey_amount || 0;
+    
+    // Calculate platform fee (10%)
+    const platformFee = Math.floor(honeyAmount * PLATFORM_FEE_PERCENT / 100);
+    const honeyToBee = honeyAmount - platformFee;
+    
+    // Update escrow status
     db.prepare(`
       UPDATE escrow 
       SET status = 'released', released_at = CURRENT_TIMESTAMP, released_to_bee_id = ?
       WHERE gig_id = ? AND status = 'held'
     `).run(beeId, gigId);
+    
+    // Transfer honey to bee
+    db.prepare('UPDATE bees SET honey = honey + ? WHERE id = ?').run(honeyToBee, beeId);
+    
+    return { honeyReleased: honeyToBee, platformFee };
   }
 }
 
-export async function refundEscrow(gigId: string, note?: string) {
+// Refund escrow - return honey to user
+export async function refundEscrow(gigId: string, note?: string): Promise<{ honeyRefunded: number }> {
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
+    
+    // Get escrow details
+    const escrowResult = await sql`SELECT honey_amount, user_id FROM escrow WHERE gig_id = ${gigId} AND status = 'held'`;
+    const escrow = escrowResult.rows[0];
+    const honeyAmount = escrow?.honey_amount || 0;
+    const userId = escrow?.user_id;
+    
+    // Update escrow status
     await sql`
       UPDATE escrow 
       SET status = 'refunded', refunded_at = NOW(), note = ${note || null}
       WHERE gig_id = ${gigId} AND status = 'held'
     `;
+    
+    // Return honey to user
+    if (userId && honeyAmount > 0) {
+      await sql`UPDATE users SET honey = honey + ${honeyAmount} WHERE id = ${userId}`;
+    }
+    
+    return { honeyRefunded: honeyAmount };
   } else {
+    // Get escrow details
+    const escrow = db.prepare('SELECT honey_amount, user_id FROM escrow WHERE gig_id = ? AND status = ?').get(gigId, 'held') as any;
+    const honeyAmount = escrow?.honey_amount || 0;
+    const userId = escrow?.user_id;
+    
+    // Update escrow status
     db.prepare(`
       UPDATE escrow 
       SET status = 'refunded', refunded_at = CURRENT_TIMESTAMP, note = ?
       WHERE gig_id = ? AND status = 'held'
     `).run(note || null, gigId);
+    
+    // Return honey to user
+    if (userId && honeyAmount > 0) {
+      db.prepare('UPDATE users SET honey = honey + ? WHERE id = ?').run(honeyAmount, userId);
+    }
+    
+    return { honeyRefunded: honeyAmount };
   }
 }
 
-// ============ Accept Bid with Escrow ============
+// ============ Accept Bid with Honey Escrow ============
 
-export async function acceptBid(bidId: string, gigId: string, userId: string) {
+export async function acceptBid(bidId: string, gigId: string, userId: string): Promise<{ success: boolean; error?: string }> {
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
     
     const gigResult = await sql`SELECT * FROM gigs WHERE id = ${gigId} AND user_id = ${userId}`;
-    if (gigResult.rows.length === 0) return false;
+    if (gigResult.rows.length === 0) return { success: false, error: 'Gig not found' };
     const gig = gigResult.rows[0];
 
     const bidResult = await sql`SELECT * FROM bids WHERE id = ${bidId} AND gig_id = ${gigId}`;
-    if (bidResult.rows.length === 0) return false;
+    if (bidResult.rows.length === 0) return { success: false, error: 'Bid not found' };
     const bid = bidResult.rows[0];
 
-    // Create escrow when accepting bid
+    // Get the honey amount from bid (honey_requested) - must be <= gig's honey_reward
+    const honeyAmount = bid.honey_requested || gig.honey_reward || 0;
+    if (honeyAmount > (gig.honey_reward || 0)) {
+      return { success: false, error: 'Bid honey exceeds gig reward' };
+    }
+
+    // Deduct honey from user's balance for escrow
+    const deducted = await deductUserHoney(userId, honeyAmount);
+    if (!deducted) {
+      return { success: false, error: 'Insufficient honey balance' };
+    }
+
+    // Create escrow with honey_amount
     const escrowId = uuidv4();
     await sql`
-      INSERT INTO escrow (id, gig_id, user_id, amount_cents, status)
-      VALUES (${escrowId}, ${gigId}, ${userId}, ${gig.price_cents}, 'held')
+      INSERT INTO escrow (id, gig_id, user_id, honey_amount, status)
+      VALUES (${escrowId}, ${gigId}, ${userId}, ${honeyAmount}, 'held')
     `;
 
     await sql`UPDATE bids SET status = 'accepted' WHERE id = ${bidId}`;
@@ -2171,20 +2324,32 @@ export async function acceptBid(bidId: string, gigId: string, userId: string) {
     await sql`INSERT INTO gig_assignments (id, gig_id, bee_id, honey_split) VALUES (${assignId}, ${gigId}, ${bid.bee_id}, 100)`;
     await sql`UPDATE gigs SET status = 'in_progress', updated_at = NOW() WHERE id = ${gigId}`;
 
-    return true;
+    return { success: true };
   } else {
     const gig = db.prepare('SELECT * FROM gigs WHERE id = ? AND user_id = ?').get(gigId, userId) as any;
-    if (!gig) return false;
+    if (!gig) return { success: false, error: 'Gig not found' };
 
     const bid = db.prepare('SELECT * FROM bids WHERE id = ? AND gig_id = ?').get(bidId, gigId) as any;
-    if (!bid) return false;
+    if (!bid) return { success: false, error: 'Bid not found' };
 
-    // Create escrow when accepting bid
+    // Get the honey amount from bid (honey_requested) - must be <= gig's honey_reward
+    const honeyAmount = bid.honey_requested || gig.honey_reward || 0;
+    if (honeyAmount > (gig.honey_reward || 0)) {
+      return { success: false, error: 'Bid honey exceeds gig reward' };
+    }
+
+    // Deduct honey from user's balance for escrow
+    const deducted = await deductUserHoney(userId, honeyAmount);
+    if (!deducted) {
+      return { success: false, error: 'Insufficient honey balance' };
+    }
+
+    // Create escrow with honey_amount
     const escrowId = uuidv4();
     db.prepare(`
-      INSERT INTO escrow (id, gig_id, user_id, amount_cents, status)
+      INSERT INTO escrow (id, gig_id, user_id, honey_amount, status)
       VALUES (?, ?, ?, ?, 'held')
-    `).run(escrowId, gigId, userId, gig.price_cents);
+    `).run(escrowId, gigId, userId, honeyAmount);
 
     db.prepare("UPDATE bids SET status = 'accepted' WHERE id = ?").run(bidId);
     db.prepare("UPDATE bids SET status = 'rejected' WHERE gig_id = ? AND id != ?").run(gigId, bidId);
@@ -2193,7 +2358,7 @@ export async function acceptBid(bidId: string, gigId: string, userId: string) {
     db.prepare(`INSERT INTO gig_assignments (id, gig_id, bee_id, honey_split) VALUES (?, ?, ?, 100)`).run(assignId, gigId, bid.bee_id);
     db.prepare("UPDATE gigs SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(gigId);
 
-    return true;
+    return { success: true };
   }
 }
 
@@ -2264,12 +2429,19 @@ export async function approveDeliverable(deliverableId: string, gigId: string, u
     await sql`UPDATE deliverables SET status = 'approved', responded_at = NOW() WHERE id = ${deliverableId}`;
     await sql`UPDATE gigs SET status = 'completed', updated_at = NOW() WHERE id = ${gigId}`;
 
-    // Release escrow to bee
-    await releaseEscrow(gigId, deliverable.bee_id);
+    // Release escrow to bee (transfers honey with 10% platform fee)
+    const { honeyReleased } = await releaseEscrow(gigId, deliverable.bee_id);
 
-    // Award honey and update stats
-    await awardHoney(deliverable.bee_id, gigId, gig.price_cents, 'gig_completed');
-    await sql`UPDATE users SET total_gigs_completed = total_gigs_completed + 1, total_spent_cents = total_spent_cents + ${gig.price_cents} WHERE id = ${userId}`;
+    // Record in honey ledger
+    const ledgerId = uuidv4();
+    await sql`
+      INSERT INTO honey_ledger (id, bee_id, gig_id, amount, type, note)
+      VALUES (${ledgerId}, ${deliverable.bee_id}, ${gigId}, ${honeyReleased}, 'gig_completed', 'Honey earned from completed gig (after 10% platform fee)')
+    `;
+
+    // Update bee stats
+    await sql`UPDATE bees SET gigs_completed = gigs_completed + 1 WHERE id = ${deliverable.bee_id}`;
+    await sql`UPDATE users SET total_gigs_completed = total_gigs_completed + 1 WHERE id = ${userId}`;
     
     // Update bee level
     await updateBeeLevel(deliverable.bee_id);
@@ -2295,12 +2467,19 @@ export async function approveDeliverable(deliverableId: string, gigId: string, u
     db.prepare("UPDATE deliverables SET status = 'approved', responded_at = CURRENT_TIMESTAMP WHERE id = ?").run(deliverableId);
     db.prepare("UPDATE gigs SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(gigId);
 
-    // Release escrow to bee
-    await releaseEscrow(gigId, deliverable.bee_id);
+    // Release escrow to bee (transfers honey with 10% platform fee)
+    const { honeyReleased } = await releaseEscrow(gigId, deliverable.bee_id);
 
-    // Award honey and update stats
-    await awardHoney(deliverable.bee_id, gigId, gig.price_cents, 'gig_completed');
-    db.prepare('UPDATE users SET total_gigs_completed = total_gigs_completed + 1, total_spent_cents = total_spent_cents + ? WHERE id = ?').run(gig.price_cents, userId);
+    // Record in honey ledger
+    const ledgerId = uuidv4();
+    db.prepare(`
+      INSERT INTO honey_ledger (id, bee_id, gig_id, amount, type, note)
+      VALUES (?, ?, ?, ?, 'gig_completed', 'Honey earned from completed gig (after 10% platform fee)')
+    `).run(ledgerId, deliverable.bee_id, gigId, honeyReleased);
+
+    // Update bee stats
+    db.prepare('UPDATE bees SET gigs_completed = gigs_completed + 1 WHERE id = ?').run(deliverable.bee_id);
+    db.prepare('UPDATE users SET total_gigs_completed = total_gigs_completed + 1 WHERE id = ?').run(userId);
     
     // Update bee level
     await updateBeeLevel(deliverable.bee_id);

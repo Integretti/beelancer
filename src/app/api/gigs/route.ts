@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { listGigs, countGigs, createGig, getSessionUser } from '@/lib/db';
+import { listGigs, countGigs, createGig, getSessionUser, getUserHoney } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,17 +13,19 @@ export async function GET(request: NextRequest) {
       countGigs({ status })
     ]);
 
-    // Format gigs with creator info (all gigs are human-created)
+    // Format gigs with creator info (all gigs are human-created, honey-based economy)
     const formattedGigs = (gigs as any[]).map(gig => {
       const creatorName = gig.user_name || 'Anonymous';
+      const honeyReward = gig.honey_reward || 0;
       
       return {
         id: gig.id,
         title: gig.title,
         description: gig.description,
         requirements: gig.requirements,
-        price_cents: gig.price_cents,
-        price_formatted: `$${(gig.price_cents / 100).toFixed(2)}`,
+        // Honey-based economy
+        honey_reward: honeyReward,
+        honey_formatted: `🍯 ${honeyReward.toLocaleString()}`,
         status: gig.status,
         category: gig.category,
         deadline: gig.deadline,
@@ -46,7 +48,7 @@ export async function GET(request: NextRequest) {
           trust_signals: {
             has_rating: !!gig.bee_rating,
             high_approval: (gig.approval_rate || 100) >= 90,
-            escrow_ready: gig.escrow_status === 'held' || gig.price_cents === 0
+            escrow_ready: gig.escrow_status === 'held'
           }
         },
         // Legacy client field for backwards compatibility
@@ -54,11 +56,6 @@ export async function GET(request: NextRequest) {
           name: creatorName,
           rating: gig.bee_rating ? Math.round(gig.bee_rating * 10) / 10 : null,
           approval_rate: Math.round((gig.approval_rate || 100) * 10) / 10,
-          trust_signals: {
-            has_rating: !!gig.bee_rating,
-            high_approval: (gig.approval_rate || 100) >= 90,
-            escrow_ready: gig.escrow_status === 'held' || gig.price_cents === 0
-          }
         }
       };
     });
@@ -81,10 +78,26 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, description, requirements, price_cents, category, deadline, status } = body;
+    const { title, description, requirements, honey_reward, category, deadline, status } = body;
 
     if (!title || title.length < 3) {
       return Response.json({ error: 'Title required (min 3 characters)' }, { status: 400 });
+    }
+
+    // Validate honey_reward
+    const reward = parseInt(honey_reward) || 0;
+    if (reward < 100) {
+      return Response.json({ error: 'Minimum honey reward is 100 🍯' }, { status: 400 });
+    }
+
+    // Check user's honey balance
+    const userHoney = await getUserHoney(session.user_id);
+    if (userHoney < reward) {
+      return Response.json({ 
+        error: `Insufficient honey. You have ${userHoney} 🍯 but need ${reward} 🍯`,
+        your_balance: userHoney,
+        required: reward
+      }, { status: 400 });
     }
 
     // Validate status if provided
@@ -95,15 +108,23 @@ export async function POST(request: NextRequest) {
       title,
       description,
       requirements,
-      price_cents: price_cents || 0,
+      honey_reward: reward,
       category,
       deadline,
       status: gigStatus,
     });
 
-    return Response.json({ success: true, gig }, { status: 201 });
-  } catch (error) {
+    return Response.json({ 
+      success: true, 
+      gig,
+      message: `Gig created with ${reward} 🍯 honey reward. This will be held in escrow when a bid is accepted.`
+    }, { status: 201 });
+  } catch (error: any) {
     console.error('Create gig error:', error);
+    // Handle specific errors from createGig
+    if (error.message?.includes('Minimum honey') || error.message?.includes('Insufficient honey')) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
     return Response.json({ error: 'Failed to create gig' }, { status: 500 });
   }
 }
