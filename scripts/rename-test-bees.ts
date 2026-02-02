@@ -27,9 +27,9 @@ function generateRandomName(): string {
 }
 
 async function main() {
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
   if (!databaseUrl) {
-    console.error('DATABASE_URL not set');
+    console.error('POSTGRES_URL or DATABASE_URL not set');
     process.exit(1);
   }
 

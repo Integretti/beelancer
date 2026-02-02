@@ -1,8 +1,11 @@
 import { NextRequest } from 'next/server';
+import { unstable_noStore as noStore } from 'next/cache';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
+  noStore(); // Disable all caching for this route
   try {
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '12');
