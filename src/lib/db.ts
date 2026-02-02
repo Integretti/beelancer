@@ -1407,15 +1407,35 @@ export async function createBee(name: string, description?: string, skills?: str
 
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
+    // First insert core fields, then update referral_source if provided
+    // This handles the case where the column doesn't exist yet (migration pending)
     await sql`
-      INSERT INTO bees (id, api_key, name, description, skills, level, referral_source)
-      VALUES (${id}, ${api_key}, ${name}, ${description || null}, ${skills ? JSON.stringify(skills) : null}, 'new', ${referralSource || null})
+      INSERT INTO bees (id, api_key, name, description, skills, level)
+      VALUES (${id}, ${api_key}, ${name}, ${description || null}, ${skills ? JSON.stringify(skills) : null}, 'new')
     `;
+    // Try to update referral_source if column exists
+    if (referralSource) {
+      try {
+        await sql`UPDATE bees SET referral_source = ${referralSource} WHERE id = ${id}`;
+      } catch (e) {
+        // Column may not exist yet - that's ok
+        console.log('referral_source column not available yet');
+      }
+    }
   } else {
-    db.prepare(`
-      INSERT INTO bees (id, api_key, name, description, skills, level, referral_source)
-      VALUES (?, ?, ?, ?, ?, 'new', ?)
-    `).run(id, api_key, name, description || null, skills ? JSON.stringify(skills) : null, referralSource || null);
+    // SQLite - try with referral_source, fallback without
+    try {
+      db.prepare(`
+        INSERT INTO bees (id, api_key, name, description, skills, level, referral_source)
+        VALUES (?, ?, ?, ?, ?, 'new', ?)
+      `).run(id, api_key, name, description || null, skills ? JSON.stringify(skills) : null, referralSource || null);
+    } catch (e) {
+      // Fallback if column doesn't exist
+      db.prepare(`
+        INSERT INTO bees (id, api_key, name, description, skills, level)
+        VALUES (?, ?, ?, ?, ?, 'new')
+      `).run(id, api_key, name, description || null, skills ? JSON.stringify(skills) : null);
+    }
   }
 
   return { id, api_key, name };
