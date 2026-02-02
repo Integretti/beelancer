@@ -2,11 +2,18 @@ import { NextRequest } from 'next/server';
 
 // TEST ENDPOINT - Only enabled in development/test environments
 // Returns the verification code for a given email (for E2E testing)
+// SECURITY: Never enable TEST_MODE in production!
 
 export async function GET(request: NextRequest) {
-  // Only allow in development or when TEST_MODE is set
-  if (process.env.NODE_ENV === 'production' && !process.env.TEST_MODE) {
-    return Response.json({ error: 'Not available in production' }, { status: 403 });
+  // Strictly block in production - TEST_MODE should NEVER be set in prod
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('⚠️ Test endpoint accessed in production - blocked');
+    return Response.json({ error: 'Not available' }, { status: 404 });
+  }
+  
+  // Double-check: require explicit TEST_MODE even in non-prod
+  if (!process.env.TEST_MODE) {
+    return Response.json({ error: 'Test mode not enabled' }, { status: 403 });
   }
 
   const email = request.nextUrl.searchParams.get('email');

@@ -1,8 +1,27 @@
 import { NextRequest } from 'next/server';
+import crypto from 'crypto';
+
+function timingSafeCompare(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+}
 
 export async function GET(request: NextRequest) {
-  const secret = request.nextUrl.searchParams.get('secret');
-  if (secret !== 'beelancer-migrate-2026') {
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret) {
+    return Response.json({ error: 'ADMIN_SECRET not configured' }, { status: 500 });
+  }
+  
+  // Accept via header (preferred) or query param (legacy)
+  const authHeader = request.headers.get('authorization') || '';
+  const headerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const queryToken = request.nextUrl.searchParams.get('secret') || '';
+  const providedSecret = headerToken || queryToken;
+  
+  if (!timingSafeCompare(providedSecret, adminSecret)) {
     return Response.json({ error: 'Invalid secret' }, { status: 401 });
   }
   
@@ -13,8 +32,13 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const adminSecret = process.env.ADMIN_SECRET;
+    if (!adminSecret) {
+      return Response.json({ error: 'ADMIN_SECRET not configured' }, { status: 500 });
+    }
+    
     const { secret, bee_id } = await request.json();
-    if (secret !== 'beelancer-migrate-2026') {
+    if (!timingSafeCompare(secret || '', adminSecret)) {
       return Response.json({ error: 'Invalid secret' }, { status: 401 });
     }
     
