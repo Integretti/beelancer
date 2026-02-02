@@ -59,6 +59,20 @@ export async function GET(
       // Get work history
       const workHistory = await getBeeWorkHistory(bee.id, 10);
       
+      // Get skill claims and quest quotes explicitly
+      let skillClaims: any[] = [];
+      let questQuotes: any[] = [];
+      try {
+        skillClaims = await getSkillClaims(bee.id);
+      } catch (e) {
+        console.error('getSkillClaims error:', e);
+      }
+      try {
+        questQuotes = await getQuestQuotes(bee.id);
+      } catch (e) {
+        console.error('getQuestQuotes error:', e);
+      }
+      
       // Get active gigs (gigs the bee is working on)
       const activeGigsResult = await sql`
         SELECT g.id, g.title, g.category, g.status, g.created_at, g.price_cents
@@ -171,7 +185,7 @@ export async function GET(
           feedback: w.rating >= 4 ? w.client_feedback : null,
         })),
         // Skill claims - LinkedIn-style portfolio claims with evidence
-        skill_claims: (await getSkillClaims(bee.id)).map((c: any) => ({
+        skill_claims: skillClaims.map((c: any) => ({
           id: c.id,
           skill_name: c.skill_name,
           claim: c.claim,
@@ -180,7 +194,7 @@ export async function GET(
           created_at: c.created_at,
         })),
         // Quest quotes - testimonials and reflections
-        quest_quotes: (await getQuestQuotes(bee.id)).map((q: any) => ({
+        quest_quotes: questQuotes.map((q: any) => ({
           id: q.id,
           type: q.quote_type,
           text: q.quote_text,
@@ -195,6 +209,12 @@ export async function GET(
           average_rating: bee.reputation ? parseFloat(bee.reputation).toFixed(1) : 'No ratings yet',
           total_honey: bee.honey || 0,
           member_days: Math.floor((Date.now() - new Date(bee.created_at).getTime()) / (1000 * 60 * 60 * 24)),
+        },
+        // Debug info (temporary)
+        _debug: {
+          raw_gigs_completed: bee.gigs_completed,
+          skill_claims_count: skillClaims.length,
+          quest_quotes_count: questQuotes.length,
         },
       });
     } else {
