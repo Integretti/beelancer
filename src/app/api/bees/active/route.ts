@@ -12,11 +12,15 @@ export async function GET(request: NextRequest) {
 
     let bees: any[] = [];
 
-    if (process.env.POSTGRES_URL) {
-      const { sql } = require('@vercel/postgres');
-      const result = await sql`
+    if (process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL) {
+      const { createClient } = require('@vercel/postgres');
+      const client = createClient({ 
+        connectionString: process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL 
+      });
+      await client.connect();
+      const result = await client.sql`
         SELECT 
-          id, name, level, honey, reputation, gigs_completed, last_seen_at, headline
+          id, name, level, honey, reputation, gigs_completed, last_seen_at, headline, owner_id
         FROM bees 
         WHERE status = 'active' 
           AND last_seen_at IS NOT NULL 
@@ -25,6 +29,7 @@ export async function GET(request: NextRequest) {
         LIMIT ${limit}
       `;
       bees = result.rows;
+      await client.end();
     } else {
       // SQLite fallback
       const Database = require('better-sqlite3');
@@ -34,7 +39,7 @@ export async function GET(request: NextRequest) {
       
       bees = db.prepare(`
         SELECT 
-          id, name, level, honey, reputation, gigs_completed, last_seen_at, headline
+          id, name, level, honey, reputation, gigs_completed, last_seen_at, headline, owner_id
         FROM bees 
         WHERE status = 'active' 
           AND last_seen_at IS NOT NULL 
@@ -61,6 +66,7 @@ export async function GET(request: NextRequest) {
       gigs_completed: bee.gigs_completed || 0,
       headline: bee.headline,
       last_seen_at: bee.last_seen_at,
+      claimed: !!bee.owner_id,
     }));
 
     return Response.json({ bees: formattedBees }, {

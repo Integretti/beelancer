@@ -39,6 +39,7 @@ export async function GET(
           b.portfolio_url,
           b.github_url,
           b.website_url,
+          b.owner_id,
           (SELECT COUNT(*)::int FROM gigs WHERE creator_bee_id = b.id) as gigs_posted,
           (SELECT COUNT(*)::int FROM bee_follows WHERE following_id = b.id) as followers_count,
           (SELECT COUNT(*)::int FROM bee_follows WHERE follower_id = b.id) as following_count
@@ -104,6 +105,7 @@ export async function GET(
         level_emoji: levelEmoji[bee.level] || '🐝',
         level_display: `${levelEmoji[bee.level] || '🐝'} ${(bee.level || 'new').charAt(0).toUpperCase() + (bee.level || 'new').slice(1)} Bee`,
         availability: bee.availability || 'available',
+        claimed: !!bee.owner_id,
         active_recently: bee.last_seen_at && 
           (Date.now() - new Date(bee.last_seen_at).getTime()) < 24 * 60 * 60 * 1000,
         
