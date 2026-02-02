@@ -404,6 +404,45 @@ async function initPostgres() {
   await sql`CREATE INDEX IF NOT EXISTS idx_blog_category ON blog_posts(category)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_blog_featured ON blog_posts(featured)`;
 
+  // Rate limits (used by src/lib/rateLimit.ts)
+  await sql`
+    CREATE TABLE IF NOT EXISTS rate_limits (
+      entity_type TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      last_action_at TIMESTAMP NOT NULL,
+      PRIMARY KEY (entity_type, entity_id, action)
+    )
+  `;
+
+  // Referral codewords (A/B tracking)
+  await sql`
+    CREATE TABLE IF NOT EXISTS referral_codewords (
+      codeword TEXT PRIMARY KEY,
+      referrer_bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      platform TEXT,
+      variant TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
+  // Referrals: attribution locked at signup (new bee)
+  await sql`
+    CREATE TABLE IF NOT EXISTS referrals (
+      id TEXT PRIMARY KEY,
+      codeword TEXT REFERENCES referral_codewords(codeword) ON DELETE SET NULL,
+      referrer_bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      new_bee_id TEXT UNIQUE REFERENCES bees(id) ON DELETE CASCADE,
+      attributed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      qualified_at TIMESTAMP,
+      qualification_rule_version TEXT,
+      qualifying_bid_id TEXT REFERENCES bids(id) ON DELETE SET NULL,
+      qualifying_gig_id TEXT REFERENCES gigs(id) ON DELETE SET NULL,
+      referrer_bonus_honey INTEGER DEFAULT 0,
+      newbee_bonus_honey INTEGER DEFAULT 0
+    )
+  `;
+
   // Run Postgres migrations for existing tables
   await runPostgresMigrations();
   
@@ -452,6 +491,10 @@ async function runPostgresMigrations() {
   await addColumnIfNotExists('bees', 'github_url', 'TEXT');
   await addColumnIfNotExists('bees', 'website_url', 'TEXT');
   await addColumnIfNotExists('bees', 'referral_source', 'TEXT');
+  await addColumnIfNotExists('bees', 'email', 'TEXT');
+  await addColumnIfNotExists('bees', 'email_verified', 'INTEGER', '0');
+  await addColumnIfNotExists('bees', 'verification_token', 'TEXT');
+  await addColumnIfNotExists('bees', 'verification_expires', 'TIMESTAMP');
 
   // Create work history table if it doesn't exist
   await sql`
@@ -1281,6 +1324,43 @@ The hive is smarter than any individual bee. Use it.`
 }
 
 function runMigrations() {
+  // Ensure ancillary tables exist for SQLite (referrals, rate limits)
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS rate_limits (
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        last_action_at TEXT NOT NULL,
+        PRIMARY KEY (entity_type, entity_id, action)
+      );
+
+      CREATE TABLE IF NOT EXISTS referral_codewords (
+        codeword TEXT PRIMARY KEY,
+        referrer_bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+        platform TEXT,
+        variant TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS referrals (
+        id TEXT PRIMARY KEY,
+        codeword TEXT REFERENCES referral_codewords(codeword) ON DELETE SET NULL,
+        referrer_bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+        new_bee_id TEXT UNIQUE REFERENCES bees(id) ON DELETE CASCADE,
+        attributed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        qualified_at TEXT,
+        qualification_rule_version TEXT,
+        qualifying_bid_id TEXT REFERENCES bids(id) ON DELETE SET NULL,
+        qualifying_gig_id TEXT REFERENCES gigs(id) ON DELETE SET NULL,
+        referrer_bonus_honey INTEGER DEFAULT 0,
+        newbee_bonus_honey INTEGER DEFAULT 0
+      );
+    `);
+  } catch (e) {
+    // ignore
+  }
+
   // Add new columns if they don't exist (for existing databases)
   const migrations = [
     // Users table migrations
@@ -1307,6 +1387,10 @@ function runMigrations() {
     `ALTER TABLE bees ADD COLUMN github_url TEXT`,
     `ALTER TABLE bees ADD COLUMN website_url TEXT`,
     `ALTER TABLE bees ADD COLUMN referral_source TEXT`,
+    `ALTER TABLE bees ADD COLUMN email TEXT`,
+    `ALTER TABLE bees ADD COLUMN email_verified INTEGER DEFAULT 0`,
+    `ALTER TABLE bees ADD COLUMN verification_token TEXT`,
+    `ALTER TABLE bees ADD COLUMN verification_expires TEXT`,
     // Gigs table migrations
     `ALTER TABLE gigs ADD COLUMN revision_count INTEGER DEFAULT 0`,
     `ALTER TABLE gigs ADD COLUMN max_revisions INTEGER DEFAULT 3`,
@@ -1571,6 +1655,200 @@ export async function createBee(name: string, description?: string, skills?: str
   }
 
   return { id, api_key, name };
+}
+
+// ============ Referrals / Codewords (A/B UA tracking) ============
+
+export async function getReferralCodeword(codeword: string) {
+  if (!codeword) return null;
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`SELECT * FROM referral_codewords WHERE codeword = ${codeword}`;
+    return result.rows[0] || null;
+  } else {
+    return db.prepare('SELECT * FROM referral_codewords WHERE codeword = ?').get(codeword) || null;
+  }
+}
+
+export async function createReferralAttribution(codeword: string, referrerBeeId: string, newBeeId: string) {
+  const id = uuidv4();
+  const rule = 'locked_at_signup';
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`
+      INSERT INTO referrals (id, codeword, referrer_bee_id, new_bee_id, qualification_rule_version)
+      VALUES (${id}, ${codeword}, ${referrerBeeId}, ${newBeeId}, ${rule})
+      ON CONFLICT (new_bee_id) DO NOTHING
+    `;
+  } else {
+    db.prepare('INSERT OR IGNORE INTO referrals (id, codeword, referrer_bee_id, new_bee_id, qualification_rule_version) VALUES (?, ?, ?, ?, ?)')
+      .run(id, codeword, referrerBeeId, newBeeId, rule);
+  }
+  return { id };
+}
+
+export async function getReferralByNewBeeId(newBeeId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`SELECT * FROM referrals WHERE new_bee_id = ${newBeeId}`;
+    return result.rows[0] || null;
+  } else {
+    return db.prepare('SELECT * FROM referrals WHERE new_bee_id = ?').get(newBeeId) || null;
+  }
+}
+
+export async function creditBeeHoneyDirect(beeId: string, amount: number, type: string, note: string, gigId: string | null = null) {
+  const id = uuidv4();
+  const amt = Math.floor(amount);
+  if (!amt) return;
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`INSERT INTO honey_ledger (id, bee_id, gig_id, amount, type, note) VALUES (${id}, ${beeId}, ${gigId}, ${amt}, ${type}, ${note})`;
+    await sql`UPDATE bees SET honey = honey + ${amt} WHERE id = ${beeId}`;
+  } else {
+    db.prepare('INSERT INTO honey_ledger (id, bee_id, gig_id, amount, type, note) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(id, beeId, gigId, amt, type, note);
+    db.prepare('UPDATE bees SET honey = honey + ? WHERE id = ?').run(amt, beeId);
+  }
+}
+
+export async function tryQualifyReferralOnBid(newBeeId: string, bidId: string, gigId: string, windowHours: number = 72) {
+  const referral = await getReferralByNewBeeId(newBeeId) as any;
+  if (!referral) return { qualified: false, reason: 'no_referral' };
+  if (referral.qualified_at) return { qualified: false, reason: 'already_qualified' };
+
+  const bee = await getBeeById(newBeeId) as any;
+  if (!bee) return { qualified: false, reason: 'bee_not_found' };
+
+  if (!bee.email_verified) return { qualified: false, reason: 'email_not_verified' };
+
+  const createdAt = bee.created_at ? new Date(bee.created_at).getTime() : Date.now();
+  const withinWindow = (Date.now() - createdAt) <= windowHours * 60 * 60 * 1000;
+  if (!withinWindow) return { qualified: false, reason: 'outside_window' };
+
+  const refBonus = parseInt(process.env.REFERRAL_REFERRER_BONUS_HONEY || '0');
+  const newBonus = parseInt(process.env.REFERRAL_NEWBEE_BONUS_HONEY || '0');
+
+  const noteBase = `Referral bonus (codeword=${referral.codeword || 'unknown'})`;
+
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`
+      UPDATE referrals
+      SET qualified_at = NOW(),
+          qualification_rule_version = 'bee_email_verified_and_bid_within_72h',
+          qualifying_bid_id = ${bidId},
+          qualifying_gig_id = ${gigId},
+          referrer_bonus_honey = ${refBonus},
+          newbee_bonus_honey = ${newBonus}
+      WHERE new_bee_id = ${newBeeId} AND qualified_at IS NULL
+    `;
+  } else {
+    db.prepare(`
+      UPDATE referrals
+      SET qualified_at = CURRENT_TIMESTAMP,
+          qualification_rule_version = 'bee_email_verified_and_bid_within_72h',
+          qualifying_bid_id = ?,
+          qualifying_gig_id = ?,
+          referrer_bonus_honey = ?,
+          newbee_bonus_honey = ?
+      WHERE new_bee_id = ? AND qualified_at IS NULL
+    `).run(bidId, gigId, refBonus, newBonus, newBeeId);
+  }
+
+  if (referral.referrer_bee_id && refBonus > 0) {
+    await creditBeeHoneyDirect(referral.referrer_bee_id, refBonus, 'referral_bonus', `${noteBase} -> referrer`, gigId);
+  }
+  if (newBonus > 0) {
+    await creditBeeHoneyDirect(newBeeId, newBonus, 'referral_bonus', `${noteBase} -> new_bee`, gigId);
+  }
+
+  return { qualified: true };
+}
+
+// Bee email verification (bees, not users)
+export async function setBeeEmailVerification(beeId: string, email: string, token: string, expiresISO: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`
+      UPDATE bees
+      SET email = ${email.toLowerCase()},
+          email_verified = 0,
+          verification_token = ${token},
+          verification_expires = ${expiresISO}
+      WHERE id = ${beeId}
+    `;
+  } else {
+    db.prepare('UPDATE bees SET email = ?, email_verified = 0, verification_token = ?, verification_expires = ? WHERE id = ?')
+      .run(email.toLowerCase(), token, expiresISO, beeId);
+  }
+}
+
+export async function verifyBeeEmailToken(token: string): Promise<string | null> {
+  if (!token) return null;
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      UPDATE bees
+      SET email_verified = 1, verification_token = NULL
+      WHERE verification_token = ${token} AND (verification_expires IS NULL OR verification_expires > NOW()) AND email_verified = 0
+      RETURNING id
+    `;
+    return result.rows.length > 0 ? result.rows[0].id : null;
+  } else {
+    const bee = db.prepare("SELECT id FROM bees WHERE verification_token = ? AND (verification_expires IS NULL OR verification_expires > datetime('now')) AND email_verified = 0").get(token) as any;
+    if (!bee) return null;
+    db.prepare('UPDATE bees SET email_verified = 1, verification_token = NULL WHERE id = ?').run(bee.id);
+    return bee.id;
+  }
+}
+
+export async function getReferralStatsForReferrer(referrerBeeId: string, fromISO: string, toISO: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      SELECT r.codeword, rc.platform, rc.variant,
+        COUNT(*)::int as signups_total,
+        COUNT(*) FILTER (WHERE r.qualified_at IS NOT NULL)::int as signups_qualified,
+        COALESCE(SUM(r.referrer_bonus_honey), 0)::int as referrer_bonus_honey,
+        COALESCE(SUM(r.newbee_bonus_honey), 0)::int as newbee_bonus_honey
+      FROM referrals r
+      LEFT JOIN referral_codewords rc ON rc.codeword = r.codeword
+      WHERE r.referrer_bee_id = ${referrerBeeId}
+        AND r.attributed_at >= ${fromISO} AND r.attributed_at <= ${toISO}
+      GROUP BY r.codeword, rc.platform, rc.variant
+      ORDER BY signups_qualified DESC
+    `;
+    const by_codeword = result.rows;
+    const totals = by_codeword.reduce((acc, r)=>{
+      acc.qualified_signups += r.signups_qualified || 0;
+      acc.referrer_bonus_honey += r.referrer_bonus_honey || 0;
+      acc.newbee_bonus_honey += r.newbee_bonus_honey || 0;
+      return acc;
+    }, { qualified_signups: 0, referrer_bonus_honey: 0, newbee_bonus_honey: 0 });
+    return { from: fromISO, to: toISO, totals, by_codeword };
+  } else {
+    const rows = db.prepare(`
+      SELECT r.codeword, rc.platform, rc.variant,
+        COUNT(*) as signups_total,
+        SUM(CASE WHEN r.qualified_at IS NOT NULL THEN 1 ELSE 0 END) as signups_qualified,
+        COALESCE(SUM(r.referrer_bonus_honey), 0) as referrer_bonus_honey,
+        COALESCE(SUM(r.newbee_bonus_honey), 0) as newbee_bonus_honey
+      FROM referrals r
+      LEFT JOIN referral_codewords rc ON rc.codeword = r.codeword
+      WHERE r.referrer_bee_id = ?
+        AND r.attributed_at >= ? AND r.attributed_at <= ?
+      GROUP BY r.codeword, rc.platform, rc.variant
+      ORDER BY signups_qualified DESC
+    `).all(referrerBeeId, fromISO, toISO);
+    const totals = rows.reduce((acc, r)=>{
+      acc.qualified_signups += Number(r.signups_qualified || 0);
+      acc.referrer_bonus_honey += Number(r.referrer_bonus_honey || 0);
+      acc.newbee_bonus_honey += Number(r.newbee_bonus_honey || 0);
+      return acc;
+    }, { qualified_signups: 0, referrer_bonus_honey: 0, newbee_bonus_honey: 0 });
+    return { from: fromISO, to: toISO, totals, by_codeword: rows };
+  }
 }
 
 export async function getBeeByApiKey(apiKey: string, allowSleeping = false) {

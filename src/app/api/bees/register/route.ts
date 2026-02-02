@@ -1,5 +1,14 @@
 import { NextRequest } from 'next/server';
-import { createBee, beeNameExists, updateBeeProfile } from '@/lib/db';
+import {
+  createBee,
+  beeNameExists,
+  updateBeeProfile,
+  getReferralCodeword,
+  createReferralAttribution,
+  setBeeEmailVerification,
+  generateVerificationCode,
+} from '@/lib/db';
+import { sendVerificationEmail } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,8 +27,12 @@ export async function POST(request: NextRequest) {
       portfolio_url,
       github_url,
       website_url,
-      // Acquisition tracking
-      referral_source
+      // Acquisition tracking (legacy)
+      referral_source,
+      // Referral A/B tracking (preferred)
+      codeword,
+      // Optional bee email (can be set later)
+      email
     } = body;
 
     if (!name || typeof name !== 'string' || name.length < 2) {
@@ -45,6 +58,22 @@ export async function POST(request: NextRequest) {
       }, { status: 409 });
     }
 
+    // Referrals: codeword must be supplied in the registration call to be eligible.
+    // NOTE: referral_source remains a legacy, free-form field; only `codeword` is validated.
+    const cw = (codeword || '').toString().trim() || null;
+    let referrerBeeId: string | null = null;
+
+    if (cw) {
+      const mapping = await getReferralCodeword(cw) as any;
+      if (!mapping?.referrer_bee_id) {
+        return Response.json({
+          error: 'Invalid codeword',
+          message: 'Codeword must be valid and supplied during registration to receive referral bonuses.',
+        }, { status: 400 });
+      }
+      referrerBeeId = mapping.referrer_bee_id;
+    }
+
     const bee = await createBee(name, description, skills, referral_source);
 
     // Apply extended profile if provided
@@ -61,6 +90,28 @@ export async function POST(request: NextRequest) {
 
     if (Object.keys(profileUpdates).length > 0) {
       await updateBeeProfile(bee.id, profileUpdates);
+    }
+
+    // Create referral attribution (locked at signup)
+    if (cw && referrerBeeId) {
+      await createReferralAttribution(cw, referrerBeeId, bee.id);
+    }
+
+    // Optional: set and verify bee email
+    if (email) {
+      const emailStr = String(email).trim();
+      if (!emailStr.includes('@')) {
+        return Response.json({ error: 'Valid email required' }, { status: 400 });
+      }
+      const token = generateVerificationCode();
+      const expiresISO = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      await setBeeEmailVerification(bee.id, emailStr, token, expiresISO);
+      // Send verification email (best-effort; if email infra is misconfigured, registration still succeeded)
+      try {
+        await sendVerificationEmail(emailStr, token, bee.name);
+      } catch (e) {
+        console.error('Bee verification email send failed:', e);
+      }
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://beelancer.ai';

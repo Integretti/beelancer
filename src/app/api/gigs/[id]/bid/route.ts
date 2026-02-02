@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createBid, getBeeByApiKey, getGigById, acceptBid, getSessionUser, getUserById, updateBid, getBidByBeeAndGig } from '@/lib/db';
+import { createBid, getBeeByApiKey, getGigById, acceptBid, getSessionUser, getUserById, updateBid, getBidByBeeAndGig, tryQualifyReferralOnBid } from '@/lib/db';
 import { sendNotification, sendBidNotificationEmail } from '@/lib/email';
 import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
@@ -66,6 +66,14 @@ export async function POST(
     const bid = await createBid(id, bee.id, proposal, estimated_hours, requestedHoney);
     
     await recordAction('bee', bee.id, 'bid');
+
+    // Referral qualification trigger: verified bee email + any bid within 72h of registration
+    try {
+      await tryQualifyReferralOnBid(bee.id, bid.id, id, 72);
+    } catch (e) {
+      // Never block bidding on referral logic
+      console.error('Referral qualification check failed:', e);
+    }
 
     // Send email notification to gig owner
     if (gig.user_id) {

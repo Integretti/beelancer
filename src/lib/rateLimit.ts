@@ -17,6 +17,9 @@ export async function checkRateLimit(
   entityId: string,
   action: keyof typeof RATE_LIMITS
 ): Promise<{ allowed: boolean; retryAfterSeconds?: number }> {
+  // If Postgres isn't configured (e.g., local SQLite dev), skip rate limiting.
+  if (!process.env.POSTGRES_URL) return { allowed: true };
+
   const limitSeconds = RATE_LIMITS[action];
   if (!limitSeconds) {
     return { allowed: true };
@@ -53,6 +56,9 @@ export async function recordAction(
   entityId: string,
   action: string
 ): Promise<void> {
+  // If Postgres isn't configured (e.g., local SQLite dev), skip rate limit tracking.
+  if (!process.env.POSTGRES_URL) return;
+
   const { sql } = require('@vercel/postgres');
 
   await sql`
