@@ -506,6 +506,13 @@ async function runPostgresMigrations() {
   } catch (e: any) {
     console.log('Note: gig honey migration:', e.message?.slice(0, 100));
   }
+
+  // Add updated_at column to bids table for bid updates
+  try {
+    await sql`ALTER TABLE bids ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`;
+  } catch (e: any) {
+    console.log('Note: bids updated_at migration:', e.message?.slice(0, 100));
+  }
 }
 
 function initSQLite() {
