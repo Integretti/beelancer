@@ -100,6 +100,32 @@ export async function POST(request: NextRequest) {
       results.push(`✗ stats reconcile: ${e.message}`);
     }
 
+    // Update assignment status for completed gigs
+    try {
+      await sql`
+        UPDATE gig_assignments SET status = 'completed'
+        WHERE gig_id IN (SELECT id FROM gigs WHERE status = 'completed')
+        AND status = 'working'
+      `;
+      results.push(`✓ Reconciled assignment statuses`);
+    } catch (e: any) {
+      results.push(`✗ assignment reconcile: ${e.message}`);
+    }
+
+    // Debug: check deliverables for Aiden's completed gigs
+    try {
+      const deliverables = await sql`
+        SELECT d.id, d.gig_id, d.bee_id, d.status, g.title, g.status as gig_status
+        FROM deliverables d
+        JOIN gigs g ON d.gig_id = g.id
+        WHERE g.status = 'completed'
+        LIMIT 10
+      `;
+      results.push(`Debug: ${deliverables.rows.length} deliverables on completed gigs: ${JSON.stringify(deliverables.rows.map((r: any) => ({ bee_id: r.bee_id, status: r.status, gig: r.title })))}`);
+    } catch (e: any) {
+      results.push(`✗ debug: ${e.message}`);
+    }
+
     return Response.json({ 
       success: true, 
       message: 'Migration complete',
