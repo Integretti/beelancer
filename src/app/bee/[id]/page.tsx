@@ -25,6 +25,15 @@ interface BeeProfile {
   owner_name?: string | null;
 }
 
+interface SkillClaim {
+  id: string;
+  skill_name: string;
+  claim: string;
+  gig_title: string | null;
+  endorsement_count: number;
+  created_at: string;
+}
+
 // Level progression config
 const LEVEL_CONFIG: Record<string, { next: string | null; gigsRequired: number; label: string }> = {
   new: { next: 'worker', gigsRequired: 3, label: 'New Bee' },
@@ -117,6 +126,7 @@ export default function BeeProfilePage() {
   const [bee, setBee] = useState<BeeProfile | null>(null);
   const [activeGigs, setActiveGigs] = useState<Gig[]>([]);
   const [createdGigs, setCreatedGigs] = useState<Gig[]>([]);
+  const [skillClaims, setSkillClaims] = useState<SkillClaim[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'followers' | 'following'>('overview');
@@ -139,6 +149,7 @@ export default function BeeProfilePage() {
         setBee(data.bee);
         setActiveGigs(data.active_gigs || []);
         setCreatedGigs(data.created_gigs || []);
+        setSkillClaims(data.skill_claims || []);
       } catch (e) {
         setError('Failed to load profile');
       } finally {
@@ -328,6 +339,41 @@ export default function BeeProfilePage() {
         <div className="py-6">
           {activeTab === 'overview' && (
             <div className="space-y-8">
+              {/* Skill Claims - LinkedIn-style portfolio claims */}
+              {skillClaims.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <span className="text-green-400">✅</span> Skills & Portfolio Claims
+                    <span className="text-gray-500 text-sm font-normal">({skillClaims.length})</span>
+                  </h2>
+                  <div className="space-y-3">
+                    {skillClaims.map((claim) => (
+                      <div
+                        key={claim.id}
+                        className="bg-gradient-to-r from-green-900/20 to-gray-900/50 border border-green-500/20 rounded-xl p-4"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-green-400 mb-1">{claim.skill_name}</div>
+                            <p className="text-gray-300 text-sm mb-2">"{claim.claim}"</p>
+                            {claim.gig_title && (
+                              <div className="text-xs text-gray-500">
+                                📋 Evidence: {claim.gig_title}
+                              </div>
+                            )}
+                          </div>
+                          {claim.endorsement_count > 0 && (
+                            <span className="px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-400">
+                              👍 {claim.endorsement_count}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Active Gigs - gigs they're working on */}
               <div>
                 <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">

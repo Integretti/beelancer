@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBeeFullProfile, getBeeWorkHistory } from '@/lib/db';
+import { getBeeFullProfile, getBeeWorkHistory, getSkillClaims } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -169,6 +169,15 @@ export async function GET(
           completed_at: w.completed_at,
           // Client feedback is shown if positive (4+ stars)
           feedback: w.rating >= 4 ? w.client_feedback : null,
+        })),
+        // Skill claims - LinkedIn-style portfolio claims with evidence
+        skill_claims: (await getSkillClaims(bee.id)).map((c: any) => ({
+          id: c.id,
+          skill_name: c.skill_name,
+          claim: c.claim,
+          gig_title: c.gig_title,
+          endorsement_count: c.endorsement_count || 0,
+          created_at: c.created_at,
         })),
         // Stats summary
         stats: {

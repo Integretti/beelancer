@@ -130,6 +130,20 @@ async function initPostgres() {
     )
   `;
 
+  // Skill claims - LinkedIn-style portfolio claims from completed work
+  await sql`
+    CREATE TABLE IF NOT EXISTS skill_claims (
+      id TEXT PRIMARY KEY,
+      bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      skill_name TEXT NOT NULL,
+      claim TEXT NOT NULL,
+      evidence_gig_id TEXT REFERENCES gigs(id) ON DELETE SET NULL,
+      gig_title TEXT,
+      endorsement_count INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
   // Gigs table with revision tracking
   await sql`
     CREATE TABLE IF NOT EXISTS gigs (
@@ -457,6 +471,20 @@ async function runPostgresMigrations() {
     )
   `;
 
+  // Create skill claims table - LinkedIn-style portfolio claims
+  await sql`
+    CREATE TABLE IF NOT EXISTS skill_claims (
+      id TEXT PRIMARY KEY,
+      bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      skill_name TEXT NOT NULL,
+      claim TEXT NOT NULL,
+      evidence_gig_id TEXT REFERENCES gigs(id) ON DELETE SET NULL,
+      gig_title TEXT,
+      endorsement_count INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+
   // Add unique index on bee names (for URL uniqueness)
   try {
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS bees_name_unique ON bees (LOWER(name)) WHERE status = 'active'`;
@@ -591,6 +619,17 @@ function initSQLite() {
       rating INTEGER,
       client_feedback TEXT,
       completed_at TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS skill_claims (
+      id TEXT PRIMARY KEY,
+      bee_id TEXT REFERENCES bees(id) ON DELETE CASCADE,
+      skill_name TEXT NOT NULL,
+      claim TEXT NOT NULL,
+      evidence_gig_id TEXT REFERENCES gigs(id) ON DELETE SET NULL,
+      gig_title TEXT,
+      endorsement_count INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -1695,6 +1734,59 @@ export async function getBeeWorkHistory(beeId: string, limit: number = 20) {
       ...row,
       skills_used: row.skills_used ? JSON.parse(row.skills_used) : []
     }));
+  }
+}
+
+// Skill claims - LinkedIn-style portfolio claims
+export async function addSkillClaim(
+  beeId: string,
+  skillName: string,
+  claim: string,
+  evidenceGigId?: string,
+  gigTitle?: string
+) {
+  const id = crypto.randomUUID();
+  
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`
+      INSERT INTO skill_claims (id, bee_id, skill_name, claim, evidence_gig_id, gig_title)
+      VALUES (${id}, ${beeId}, ${skillName}, ${claim}, ${evidenceGigId || null}, ${gigTitle || null})
+    `;
+  } else {
+    db.prepare(`
+      INSERT INTO skill_claims (id, bee_id, skill_name, claim, evidence_gig_id, gig_title)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(id, beeId, skillName, claim, evidenceGigId || null, gigTitle || null);
+  }
+  
+  return { id };
+}
+
+export async function getSkillClaims(beeId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const result = await sql`
+      SELECT * FROM skill_claims
+      WHERE bee_id = ${beeId}
+      ORDER BY created_at DESC
+    `;
+    return result.rows;
+  } else {
+    return db.prepare(`
+      SELECT * FROM skill_claims
+      WHERE bee_id = ?
+      ORDER BY created_at DESC
+    `).all(beeId);
+  }
+}
+
+export async function deleteSkillClaim(claimId: string, beeId: string) {
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`DELETE FROM skill_claims WHERE id = ${claimId} AND bee_id = ${beeId}`;
+  } else {
+    db.prepare('DELETE FROM skill_claims WHERE id = ? AND bee_id = ?').run(claimId, beeId);
   }
 }
 
