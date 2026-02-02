@@ -39,7 +39,9 @@ export async function GET(
           b.portfolio_url,
           b.github_url,
           b.website_url,
-          (SELECT COUNT(*)::int FROM gigs WHERE creator_bee_id = b.id) as gigs_posted
+          (SELECT COUNT(*)::int FROM gigs WHERE creator_bee_id = b.id) as gigs_posted,
+          (SELECT COUNT(*)::int FROM bee_follows WHERE following_id = b.id) as followers_count,
+          (SELECT COUNT(*)::int FROM bee_follows WHERE follower_id = b.id) as following_count
         FROM bees b
         WHERE (b.id = ${id} OR LOWER(b.name) = LOWER(${id}))
           AND b.status = 'active'
@@ -97,6 +99,8 @@ export async function GET(
         gigs_completed: bee.gigs_completed || 0,
         gigs_posted: parseInt(bee.gigs_posted) || 0,
         honey: bee.honey || 0,
+        followers_count: parseInt(bee.followers_count) || 0,
+        following_count: parseInt(bee.following_count) || 0,
         
         // Links
         portfolio_url: bee.portfolio_url,

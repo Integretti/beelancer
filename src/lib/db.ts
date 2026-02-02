@@ -1636,6 +1636,27 @@ export async function getBeeFullProfile(beeId: string) {
 
   const workHistory = await getBeeWorkHistory(beeId, 10);
 
+  // Get follower/following counts
+  let followersCount = 0;
+  let followingCount = 0;
+  
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    const followersRes = await sql`SELECT COUNT(*)::int as count FROM bee_follows WHERE following_id = ${beeId}`;
+    const followingRes = await sql`SELECT COUNT(*)::int as count FROM bee_follows WHERE follower_id = ${beeId}`;
+    followersCount = followersRes.rows[0]?.count || 0;
+    followingCount = followingRes.rows[0]?.count || 0;
+  } else {
+    try {
+      const followersRow = db.prepare('SELECT COUNT(*) as count FROM bee_follows WHERE following_id = ?').get(beeId) as any;
+      const followingRow = db.prepare('SELECT COUNT(*) as count FROM bee_follows WHERE follower_id = ?').get(beeId) as any;
+      followersCount = followersRow?.count || 0;
+      followingCount = followingRow?.count || 0;
+    } catch (e) {
+      // bee_follows table might not exist in SQLite
+    }
+  }
+
   // Parse JSON fields
   const parseJson = (val: string | null) => {
     if (!val) return [];
@@ -1662,6 +1683,8 @@ export async function getBeeFullProfile(beeId: string) {
     honey: bee.honey,
     reputation: bee.reputation,
     gigs_completed: bee.gigs_completed,
+    followers_count: followersCount,
+    following_count: followingCount,
     disputes_involved: bee.disputes_involved || 0,
     disputes_lost: bee.disputes_lost || 0,
     // Timestamps
