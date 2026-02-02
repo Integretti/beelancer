@@ -1,24 +1,8 @@
 import { NextRequest } from 'next/server';
-import Stripe from 'stripe';
-import { getSessionUser, createGig } from '@/lib/db';
+import { getSessionUser, createGig, getUserHoney } from '@/lib/db';
 import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
-import { v4 as uuidv4 } from 'uuid';
 
-// Lazy init to avoid issues if env var isn't set at module load
-let stripeClient: Stripe | null = null;
-function getStripe(): Stripe {
-  if (!stripeClient) {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error('STRIPE_SECRET_KEY not configured');
-    }
-    stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2026-01-28.clover',
-    });
-  }
-  return stripeClient;
-}
-
-const PLATFORM_FEE_PERCENT = 10; // 10% platform fee
+// Note: Stripe integration disabled - using honey economy instead
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,18 +23,34 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, description, requirements, price_cents, category, deadline } = body;
+    const { title, description, requirements, honey_reward, category, deadline } = body;
 
     if (!title || title.length < 3) {
       return Response.json({ error: 'Title required (min 3 characters)' }, { status: 400 });
     }
 
-    // BETA: All gigs are free during beta period
+    // Validate honey_reward
+    const reward = parseInt(honey_reward) || 100;
+    if (reward < 100) {
+      return Response.json({ error: 'Minimum honey reward is 100 🍯' }, { status: 400 });
+    }
+
+    // Check user's honey balance
+    const userHoney = await getUserHoney(session.user_id);
+    if (userHoney < reward) {
+      return Response.json({ 
+        error: `Insufficient honey. You have ${userHoney} 🍯 but need ${reward} 🍯`,
+        your_balance: userHoney,
+        required: reward
+      }, { status: 400 });
+    }
+
+    // Create gig with honey reward
     const gig = await createGig(session.user_id, {
       title,
       description,
       requirements,
-      price_cents: 0, // Force free during beta
+      honey_reward: reward,
       category,
       deadline,
     });
@@ -58,96 +58,22 @@ export async function POST(request: NextRequest) {
     // Record action for rate limiting
     await recordAction('user', session.user_id, 'gig_post');
     
-    return Response.json({ success: true, gig, free: true, beta: true });
-
-    /* PAYMENTS DISABLED DURING BETA
-    // Free gigs don't need payment
-    if (!price_cents || price_cents === 0) {
-      const gig = await createGig(session.user_id, {
-        title,
-        description,
-        requirements,
-        price_cents: 0,
-        category,
-        deadline,
-      });
-      return Response.json({ success: true, gig, free: true });
-    }
-    */
-
-    // Calculate total with platform fee
-    const platformFee = Math.ceil(price_cents * PLATFORM_FEE_PERCENT / 100);
-    const totalCents = price_cents + platformFee;
-
-    // Generate a unique ID for this pending gig
-    const pendingGigId = uuidv4();
-
-    // Create Stripe Checkout session
-    const checkoutSession = await getStripe().checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `Gig: ${title}`,
-              description: `Beelancer gig payment - escrow funds for bee workers`,
-            },
-            unit_amount: price_cents,
-          },
-          quantity: 1,
-        },
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Platform Fee (10%)',
-              description: 'Beelancer service fee',
-            },
-            unit_amount: platformFee,
-          },
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://beelancer.ai'}/dashboard?payment=success&gig=${pendingGigId}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://beelancer.ai'}/dashboard?payment=cancelled`,
-      metadata: {
-        pending_gig_id: pendingGigId,
-        user_id: session.user_id,
-        title,
-        description: description || '',
-        requirements: requirements || '',
-        price_cents: price_cents.toString(),
-        category: category || '',
-        deadline: deadline || '',
-      },
-      customer_email: session.email,
-    });
-
-    return Response.json({
-      success: true,
-      checkout_url: checkoutSession.url,
-      session_id: checkoutSession.id,
-      pending_gig_id: pendingGigId,
-      breakdown: {
-        gig_price_cents: price_cents,
-        platform_fee_cents: platformFee,
-        total_cents: totalCents,
-        platform_fee_percent: PLATFORM_FEE_PERCENT,
-      }
+    return Response.json({ 
+      success: true, 
+      gig, 
+      honey_reward: reward,
+      message: `Gig created with ${reward} 🍯 honey reward. Honey will be held in escrow when a bid is accepted.`
     });
 
   } catch (error: any) {
     console.error('Checkout error:', error);
-    console.error('Stripe key present:', !!process.env.STRIPE_SECRET_KEY);
-    console.error('Stripe key prefix:', process.env.STRIPE_SECRET_KEY?.substring(0, 10));
-    // Temporarily expose error for debugging
+    // Handle specific errors from createGig
+    if (error.message?.includes('Minimum honey') || error.message?.includes('Insufficient honey')) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
     return Response.json({ 
-      error: 'Failed to create checkout session',
-      details: error.message,
-      type: error.type || 'unknown',
-      code: error.code || 'unknown'
+      error: 'Failed to create gig',
+      details: error.message
     }, { status: 500 });
   }
 }
