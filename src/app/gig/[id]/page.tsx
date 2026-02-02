@@ -74,6 +74,9 @@ export default function GigPage() {
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [testimonialText, setTestimonialText] = useState('');
+  const [sendingTestimonial, setSendingTestimonial] = useState(false);
+  const [testimonialSent, setTestimonialSent] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -217,6 +220,34 @@ export default function GigPage() {
       body: JSON.stringify({ deliverable_id: deliverableId, action }),
     });
     window.location.reload();
+  };
+
+  const sendTestimonial = async () => {
+    if (!testimonialText.trim() || !gig) return;
+    
+    // Find the accepted bid to get the bee ID
+    const acceptedBid = bids.find(b => b.status === 'accepted');
+    if (!acceptedBid) return;
+    
+    setSendingTestimonial(true);
+    try {
+      const res = await fetch(`/api/bees/${acceptedBid.bee_id}/testimonial`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quote_text: testimonialText,
+          gig_id: gig.id,
+          gig_title: gig.title
+        }),
+      });
+      if (res.ok) {
+        setTestimonialSent(true);
+        setTestimonialText('');
+      }
+    } catch (e) {
+      console.error('Failed to send testimonial:', e);
+    }
+    setSendingTestimonial(false);
   };
 
   const formatHoney = (amount: number) => {
@@ -598,6 +629,36 @@ export default function GigPage() {
                     ? 'A bee is working on this gig. Check the Work Chat for updates.'
                     : 'Deliverables submitted! Review and approve to complete.'}
                 </p>
+              </div>
+            )}
+
+            {/* Testimonial CTA for completed gigs */}
+            {isOwner && gig.status === 'completed' && (
+              <div className="bg-gradient-to-br from-yellow-500/10 to-amber-500/5 border border-yellow-500/30 rounded-2xl p-5">
+                <p className="text-yellow-400 font-display font-semibold mb-2">⭐ Leave a Testimonial</p>
+                {testimonialSent ? (
+                  <p className="text-green-400 text-sm">✓ Testimonial sent! It will appear on the bee's profile.</p>
+                ) : (
+                  <>
+                    <p className="text-gray-400 text-sm mb-3">
+                      Help this bee build their portfolio with a testimonial.
+                    </p>
+                    <textarea
+                      value={testimonialText}
+                      onChange={(e) => setTestimonialText(e.target.value)}
+                      placeholder="Great work! Delivered on time and exceeded expectations..."
+                      className="w-full bg-black/40 border border-gray-700 rounded-lg p-3 text-sm text-white placeholder-gray-500 resize-none focus:outline-none focus:border-yellow-500/50"
+                      rows={3}
+                    />
+                    <button
+                      onClick={sendTestimonial}
+                      disabled={!testimonialText.trim() || sendingTestimonial}
+                      className="w-full mt-2 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      {sendingTestimonial ? 'Sending...' : 'Send Testimonial'}
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
