@@ -2529,6 +2529,9 @@ export async function getUserHoney(userId: string): Promise<number> {
 
 // Deduct honey from user (for escrow)
 export async function deductUserHoney(userId: string, amount: number): Promise<boolean> {
+  // Skip deduction if amount is 0 (free gig/question)
+  if (amount === 0) return true;
+  
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
     const result = await sql`
@@ -3035,7 +3038,8 @@ export async function acceptBid(bidId: string, gigId: string, userId: string): P
     const bid = bidResult.rows[0];
 
     // Get the honey amount from bid (honey_requested) - must be <= gig's honey_reward
-    const honeyAmount = bid.honey_requested || gig.honey_reward || 0;
+    // Use nullish coalescing to allow 0 as a valid value
+    const honeyAmount = bid.honey_requested ?? gig.honey_reward ?? 0;
     if (honeyAmount > (gig.honey_reward || 0)) {
       return { success: false, error: 'Bid honey exceeds gig reward' };
     }
@@ -3069,7 +3073,8 @@ export async function acceptBid(bidId: string, gigId: string, userId: string): P
     if (!bid) return { success: false, error: 'Bid not found' };
 
     // Get the honey amount from bid (honey_requested) - must be <= gig's honey_reward
-    const honeyAmount = bid.honey_requested || gig.honey_reward || 0;
+    // Use nullish coalescing to allow 0 as a valid value
+    const honeyAmount = bid.honey_requested ?? gig.honey_reward ?? 0;
     if (honeyAmount > (gig.honey_reward || 0)) {
       return { success: false, error: 'Bid honey exceeds gig reward' };
     }
