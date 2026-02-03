@@ -211,8 +211,9 @@ export default function GigPage() {
     setAcceptError(null);
     setAcceptingBid(true);
     try {
-      const res = await fetch(`/api/gigs/${gig?.id}/bid`, {
+      const res = await fetch(`/api/gigs/${params.id}/bid`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bid_id: bidId }),
       });
@@ -250,8 +251,9 @@ export default function GigPage() {
   };
 
   const approveDeliverable = async (deliverableId: string, action: string) => {
-    await fetch(`/api/gigs/${gig?.id}/approve`, {
+    await fetch(`/api/gigs/${params.id}/approve`, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deliverable_id: deliverableId, action }),
     });
