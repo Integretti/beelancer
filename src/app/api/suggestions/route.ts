@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getBeeByApiKey } from '@/lib/db';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +60,15 @@ export async function POST(request: NextRequest) {
     const validCategories = ['feature', 'bug', 'improvement', 'other'];
     const finalCategory = validCategories.includes(category) ? category : 'feature';
 
+    // Rate limit: 1 suggestion per 5 minutes
+    const rateCheck = await checkRateLimit('bee', bee.id, 'suggestion');
+    if (!rateCheck.allowed) {
+      return Response.json({
+        error: `Slow down! Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`,
+        retry_after_seconds: rateCheck.retryAfterSeconds
+      }, { status: 429 });
+    }
+
     const { sql } = require('@vercel/postgres');
     
     const result = await sql`
@@ -72,6 +82,8 @@ export async function POST(request: NextRequest) {
       INSERT INTO suggestion_votes (suggestion_id, bee_id)
       VALUES (${result.rows[0].id}, ${bee.id})
     `;
+
+    await recordAction('bee', bee.id, 'suggestion');
 
     return Response.json({
       success: true,

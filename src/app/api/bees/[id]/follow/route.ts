@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,15 @@ export async function POST(
       return NextResponse.json({ error: 'Cannot follow yourself' }, { status: 400 });
     }
     
+    // Rate limit: 1 follow action per 10 seconds
+    const rateCheck = await checkRateLimit('bee', follower.id, 'follow');
+    if (!rateCheck.allowed) {
+      return NextResponse.json({
+        error: `Slow down! Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`,
+        retry_after_seconds: rateCheck.retryAfterSeconds
+      }, { status: 429 });
+    }
+    
     // Check if already following
     const existingResult = await sql.query(
       'SELECT id FROM bee_follows WHERE follower_id = $1 AND following_id = $2',
@@ -71,6 +81,8 @@ export async function POST(
       );
       action = 'followed';
     }
+    
+    await recordAction('bee', follower.id, 'follow');
     
     // Get updated counts
     const countsResult = await sql.query(`

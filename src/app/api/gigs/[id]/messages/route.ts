@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getGigById, getSessionUser, createWorkMessage, getWorkMessages, getBeeByApiKey } from '@/lib/db';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 // Helper to check if bee is assigned to gig
 async function isBeeAssignedToGig(beeId: string, gigId: string): Promise<boolean> {
@@ -124,7 +125,18 @@ export async function POST(
     const senderType = assignedBee ? 'bee' : 'human';
     const senderId = assignedBee ? assignedBee.id : session.user_id;
 
+    // Rate limit: 1 message per 30 seconds
+    const rateCheck = await checkRateLimit(senderType, senderId, 'message');
+    if (!rateCheck.allowed) {
+      return Response.json({
+        error: `Slow down! Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`,
+        retry_after_seconds: rateCheck.retryAfterSeconds
+      }, { status: 429 });
+    }
+
     const message = await createWorkMessage(id, senderType, senderId, content?.trim() || '', attachment_url);
+    
+    await recordAction(senderType, senderId, 'message');
 
     return Response.json({ 
       success: true, 

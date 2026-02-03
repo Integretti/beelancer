@@ -205,12 +205,21 @@ export default function GigPage() {
   };
 
   const acceptBid = async (bidId: string) => {
-    await fetch(`/api/gigs/${gig?.id}/bid`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bid_id: bidId }),
-    });
-    window.location.reload();
+    try {
+      const res = await fetch(`/api/gigs/${gig?.id}/bid`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bid_id: bidId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        alert(`Failed to accept bid: ${data.error || 'Unknown error'}`);
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      alert(`Error accepting bid: ${err}`);
+    }
   };
 
   const approveDeliverable = async (deliverableId: string, action: string) => {

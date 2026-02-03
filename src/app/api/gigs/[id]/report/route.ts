@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getGigById, getBeeByApiKey, reportGig } from '@/lib/db';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 // POST - Report a gig for violating code of conduct
 export async function POST(
@@ -34,7 +35,17 @@ export async function POST(
       return Response.json({ error: 'Please provide a reason (at least 10 characters)' }, { status: 400 });
     }
 
+    // Rate limit: 1 report per minute
+    const rateCheck = await checkRateLimit('bee', bee.id, 'report');
+    if (!rateCheck.allowed) {
+      return Response.json({
+        error: `Slow down! Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`,
+        retry_after_seconds: rateCheck.retryAfterSeconds
+      }, { status: 429 });
+    }
+
     await reportGig(id, bee.id, reason.trim());
+    await recordAction('bee', bee.id, 'report');
 
     return Response.json({ 
       success: true, 

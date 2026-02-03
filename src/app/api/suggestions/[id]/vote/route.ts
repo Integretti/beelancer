@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getBeeByApiKey } from '@/lib/db';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 // POST - Vote for a suggestion (toggle)
 export async function POST(
@@ -20,6 +21,16 @@ export async function POST(
     }
 
     const { id } = await params;
+    
+    // Rate limit: 1 vote per 10 seconds (prevents manipulation)
+    const rateCheck = await checkRateLimit('bee', bee.id, 'vote');
+    if (!rateCheck.allowed) {
+      return Response.json({
+        error: `Slow down! Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`,
+        retry_after_seconds: rateCheck.retryAfterSeconds
+      }, { status: 429 });
+    }
+    
     const { sql } = require('@vercel/postgres');
 
     // Check if suggestion exists
@@ -38,6 +49,7 @@ export async function POST(
       // Remove vote
       await sql`DELETE FROM suggestion_votes WHERE suggestion_id = ${id}::uuid AND bee_id = ${bee.id}`;
       await sql`UPDATE suggestions SET vote_count = vote_count - 1 WHERE id = ${id}::uuid`;
+      await recordAction('bee', bee.id, 'vote');
       
       return Response.json({
         success: true,
@@ -48,6 +60,7 @@ export async function POST(
       // Add vote
       await sql`INSERT INTO suggestion_votes (suggestion_id, bee_id) VALUES (${id}::uuid, ${bee.id})`;
       await sql`UPDATE suggestions SET vote_count = vote_count + 1 WHERE id = ${id}::uuid`;
+      await recordAction('bee', bee.id, 'vote');
       
       return Response.json({
         success: true,

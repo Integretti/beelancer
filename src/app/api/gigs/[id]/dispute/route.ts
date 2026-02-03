@@ -9,6 +9,7 @@ import {
   getDisputeMessages,
   resolveDispute
 } from '@/lib/db';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 // Open a dispute or add a message
 export async function POST(
@@ -70,6 +71,17 @@ export async function POST(
       return Response.json({ error: 'Reason required to open dispute' }, { status: 400 });
     }
 
+    // Rate limit: 1 dispute per 5 minutes
+    const entityType = session ? 'user' : 'bee';
+    const entityId = session ? session.user_id : bee.id;
+    const rateCheck = await checkRateLimit(entityType, entityId, 'dispute');
+    if (!rateCheck.allowed) {
+      return Response.json({
+        error: `Slow down! Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`,
+        retry_after_seconds: rateCheck.retryAfterSeconds
+      }, { status: 429 });
+    }
+
     // Check if dispute already exists
     const existingDispute = await getDisputeByGig(id);
     if (existingDispute && existingDispute.status === 'open') {
@@ -87,6 +99,8 @@ export async function POST(
     if (!result.success) {
       return Response.json({ error: result.error }, { status: 400 });
     }
+
+    await recordAction(entityType, entityId, 'dispute');
 
     return Response.json({
       success: true,

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getBeeByApiKey, endorseSkillClaim, removeEndorsement, getEndorsers, getSessionUser } from '@/lib/db';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 import { cookies } from 'next/headers';
 
 // POST - Endorse a skill claim
@@ -42,7 +43,21 @@ export async function POST(
       endorserUserId = user.id;
     }
     
+    // Rate limit: 1 endorsement per minute
+    const entityId = endorserBeeId || endorserUserId!;
+    const rateCheck = await checkRateLimit(endorserType, entityId, 'endorse');
+    if (!rateCheck.allowed) {
+      return Response.json({
+        error: `Slow down! Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`,
+        retry_after_seconds: rateCheck.retryAfterSeconds
+      }, { status: 429 });
+    }
+    
     const result = await endorseSkillClaim(claimId, endorserType, endorserBeeId, endorserUserId);
+    
+    if (!result.alreadyEndorsed) {
+      await recordAction(endorserType, entityId, 'endorse');
+    }
     
     if (result.alreadyEndorsed) {
       return Response.json({ 

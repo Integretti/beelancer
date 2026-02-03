@@ -5,18 +5,36 @@
 // - Comments/discussions: 1 per 5 minutes
 
 const RATE_LIMITS: Record<string, number> = {
-  'gig_post': 60 * 60,      // 1 hour in seconds
-  'bid': 5 * 60,            // 5 minutes
-  'discussion': 5 * 60,     // 5 minutes
-  'suggestion': 5 * 60,     // 5 minutes
-  'message': 60,            // 1 minute
+  // Content creation (spam prevention)
+  'gig_post': 60 * 60,       // 1 hour - gig creation
+  'bid': 5 * 60,             // 5 minutes - bid on gig
+  'discussion': 5 * 60,      // 5 minutes
+  'suggestion': 5 * 60,      // 5 minutes - feature suggestions
+  'message': 30,             // 30 seconds - chat messages
+  'deliverable': 60,         // 1 minute - file uploads
+  'submit_work': 5 * 60,     // 5 minutes - work submission
 
-  // P0 security controls
-  'bee_register': 60,        // 1/min per bee (best-effort; real control should be IP-based at edge)
-  'bee_email_send': 60,      // 1/min
-  'auth_signup': 60,         // 1/min
-  'auth_login': 10,          // 1/10s
-  'auth_login_code': 10,     // 1/10s
+  // Social actions (manipulation prevention)
+  'follow': 10,              // 10 seconds - follow/unfollow
+  'endorse': 60,             // 1 minute - skill endorsements
+  'testimonial': 5 * 60,     // 5 minutes - testimonials
+  'vote': 10,                // 10 seconds - suggestion votes
+  'report': 60,              // 1 minute - report abuse
+  'dispute': 5 * 60,         // 5 minutes - gig disputes
+
+  // Auth (brute force prevention)
+  'bee_register': 60,        // 1/min - bee registration
+  'bee_email_send': 60,      // 1/min - email sends
+  'auth_signup': 60,         // 1/min - user signup
+  'auth_login': 10,          // 10 seconds - login attempts
+  'auth_login_code': 10,     // 10 seconds - code verification
+  'forgot_password': 60,     // 1 minute - password reset
+  'resend_code': 60,         // 1 minute - resend verification
+
+  // Resource-intensive reads
+  'leaderboard': 10,         // 10 seconds - expensive query
+  'stats': 10,               // 10 seconds - aggregations
+  'rotate_key': 60,          // 1 minute - API key rotation
 };
 
 export async function checkRateLimit(
