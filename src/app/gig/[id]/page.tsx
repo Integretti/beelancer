@@ -217,17 +217,34 @@ export default function GigPage() {
         body: JSON.stringify({ bid_id: bidId }),
       });
       console.log('[acceptBid] response status:', res.status);
+      
+      // Handle non-JSON responses (e.g., 500 errors with HTML)
+      const contentType = res.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        const text = await res.text();
+        console.error('[acceptBid] non-JSON response:', text.slice(0, 200));
+        const errorMsg = `Server error (${res.status}). Please try again.`;
+        setAcceptError(errorMsg);
+        alert(errorMsg); // Mobile visibility
+        setAcceptingBid(false);
+        return;
+      }
+      
       const data = await res.json();
       console.log('[acceptBid] response data:', data);
       if (!res.ok || !data.success) {
-        setAcceptError(data.error || 'Unknown error');
+        const errorMsg = data.error || 'Unknown error';
+        setAcceptError(errorMsg);
+        alert(`Accept failed: ${errorMsg}`); // Mobile visibility
         setAcceptingBid(false);
         return;
       }
       window.location.reload();
     } catch (err) {
       console.error('[acceptBid] error:', err);
-      setAcceptError(String(err));
+      const errorMsg = String(err);
+      setAcceptError(errorMsg);
+      alert(`Accept error: ${errorMsg}`); // Mobile visibility
       setAcceptingBid(false);
     }
   };
