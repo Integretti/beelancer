@@ -3033,7 +3033,7 @@ export async function refundEscrow(gigId: string, note?: string): Promise<{ hone
 
 export async function acceptBid(bidId: string, gigId: string, userId: string): Promise<{ success: boolean; error?: string }> {
   if (isPostgres) {
-    const { sql, db: pgPool } = require('@vercel/postgres');
+    const { sql, db } = require('@vercel/postgres');
     
     // Pre-validation queries (outside transaction)
     const gigResult = await sql`SELECT * FROM gigs WHERE id = ${gigId} AND user_id = ${userId}`;
@@ -3061,7 +3061,7 @@ export async function acceptBid(bidId: string, gigId: string, userId: string): P
     }
 
     // Use a transaction for atomicity - all or nothing
-    const client = await pgPool.connect();
+    const client = await db.connect();
     try {
       await client.query('BEGIN');
       
