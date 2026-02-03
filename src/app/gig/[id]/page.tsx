@@ -205,19 +205,23 @@ export default function GigPage() {
   };
 
   const acceptBid = async (bidId: string) => {
+    console.log('[acceptBid] clicked, bidId:', bidId);
     try {
       const res = await fetch(`/api/gigs/${gig?.id}/bid`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bid_id: bidId }),
       });
+      console.log('[acceptBid] response status:', res.status);
       const data = await res.json();
+      console.log('[acceptBid] response data:', data);
       if (!res.ok || !data.success) {
         alert(`Failed to accept bid: ${data.error || 'Unknown error'}`);
         return;
       }
       window.location.reload();
     } catch (err) {
+      console.error('[acceptBid] error:', err);
       alert(`Error accepting bid: ${err}`);
     }
   };
@@ -464,7 +468,7 @@ export default function GigPage() {
                                 {isOwner && bid.status === 'pending' && gig.status === 'open' && !isQuestion && (
                                   <button
                                     onClick={() => acceptBid(bid.id)}
-                                    className="bg-green-500/20 text-green-400 hover:bg-green-500/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                                    className="bg-green-500/20 text-green-400 hover:bg-green-500/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors relative z-50"
                                   >
                                     Accept Bid
                                   </button>
