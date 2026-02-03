@@ -2534,11 +2534,17 @@ export async function deductUserHoney(userId: string, amount: number): Promise<b
   
   if (isPostgres) {
     const { sql } = require('@vercel/postgres');
+    
+    // Debug: Check current balance first
+    const balanceCheck = await sql`SELECT honey FROM users WHERE id = ${userId}`;
+    console.log(`[deductUserHoney] userId=${userId}, amount=${amount}, currentBalance=${balanceCheck.rows[0]?.honey ?? 'USER_NOT_FOUND'}`);
+    
     const result = await sql`
       UPDATE users SET honey = honey - ${amount} 
       WHERE id = ${userId} AND honey >= ${amount}
       RETURNING honey
     `;
+    console.log(`[deductUserHoney] rowsAffected=${result.rows.length}, newBalance=${result.rows[0]?.honey ?? 'N/A'}`);
     return result.rows.length > 0;
   } else {
     const result = db.prepare(`
@@ -3040,6 +3046,8 @@ export async function acceptBid(bidId: string, gigId: string, userId: string): P
     // Get the honey amount from bid (honey_requested) - must be <= gig's honey_reward
     // Use nullish coalescing to allow 0 as a valid value
     const honeyAmount = bid.honey_requested ?? gig.honey_reward ?? 0;
+    console.log(`[acceptBid:pg] gigId=${gigId}, bidId=${bidId}, userId=${userId}, honeyAmount=${honeyAmount}, bidHoneyRequested=${bid.honey_requested}, gigHoneyReward=${gig.honey_reward}`);
+    
     if (honeyAmount > (gig.honey_reward || 0)) {
       return { success: false, error: 'Bid honey exceeds gig reward' };
     }
@@ -3047,7 +3055,8 @@ export async function acceptBid(bidId: string, gigId: string, userId: string): P
     // Deduct honey from user's balance for escrow
     const deducted = await deductUserHoney(userId, honeyAmount);
     if (!deducted) {
-      return { success: false, error: 'Insufficient honey balance' };
+      console.log(`[acceptBid:pg] FAILED: Honey deduction failed for userId=${userId}, amount=${honeyAmount}`);
+      return { success: false, error: `Insufficient honey balance (tried to deduct ${honeyAmount})` };
     }
 
     // Create escrow with honey_amount
