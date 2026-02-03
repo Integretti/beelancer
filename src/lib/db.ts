@@ -3033,8 +3033,9 @@ export async function refundEscrow(gigId: string, note?: string): Promise<{ hone
 
 export async function acceptBid(bidId: string, gigId: string, userId: string): Promise<{ success: boolean; error?: string }> {
   if (isPostgres) {
-    const { sql } = require('@vercel/postgres');
+    const { sql, db: pgPool } = require('@vercel/postgres');
     
+    // Pre-validation queries (outside transaction)
     const gigResult = await sql`SELECT * FROM gigs WHERE id = ${gigId} AND user_id = ${userId}`;
     if (gigResult.rows.length === 0) return { success: false, error: 'Gig not found' };
     const gig = gigResult.rows[0];
@@ -3052,28 +3053,73 @@ export async function acceptBid(bidId: string, gigId: string, userId: string): P
       return { success: false, error: 'Bid honey exceeds gig reward' };
     }
 
-    // Deduct honey from user's balance for escrow
-    const deducted = await deductUserHoney(userId, honeyAmount);
-    if (!deducted) {
-      console.log(`[acceptBid:pg] FAILED: Honey deduction failed for userId=${userId}, amount=${honeyAmount}`);
-      return { success: false, error: `Insufficient honey balance (tried to deduct ${honeyAmount})` };
+    // Check user has sufficient honey before starting transaction
+    const userBalance = await getUserHoney(userId);
+    if (userBalance < honeyAmount) {
+      console.log(`[acceptBid:pg] FAILED: Insufficient honey. userId=${userId}, balance=${userBalance}, needed=${honeyAmount}`);
+      return { success: false, error: `Insufficient honey balance (have ${userBalance}, need ${honeyAmount})` };
     }
 
-    // Create escrow with honey_amount
-    const escrowId = uuidv4();
-    await sql`
-      INSERT INTO escrow (id, gig_id, user_id, honey_amount, status)
-      VALUES (${escrowId}, ${gigId}, ${userId}, ${honeyAmount}, 'held')
-    `;
+    // Use a transaction for atomicity - all or nothing
+    const client = await pgPool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Deduct honey within transaction
+      const deductResult = await client.query(
+        'UPDATE users SET honey = honey - $1 WHERE id = $2 AND honey >= $1 RETURNING honey',
+        [honeyAmount, userId]
+      );
+      if (deductResult.rowCount === 0) {
+        throw new Error('Honey deduction failed - insufficient balance or user not found');
+      }
+      console.log(`[acceptBid:pg] Deducted ${honeyAmount} honey from userId=${userId}, new balance=${deductResult.rows[0].honey}`);
 
-    await sql`UPDATE bids SET status = 'accepted' WHERE id = ${bidId}`;
-    await sql`UPDATE bids SET status = 'rejected' WHERE gig_id = ${gigId} AND id != ${bidId}`;
+      // Create escrow with honey_amount
+      const escrowId = uuidv4();
+      await client.query(
+        `INSERT INTO escrow (id, gig_id, user_id, honey_amount, status) VALUES ($1, $2, $3, $4, 'held')`,
+        [escrowId, gigId, userId, honeyAmount]
+      );
+      console.log(`[acceptBid:pg] Created escrow id=${escrowId}`);
 
-    const assignId = uuidv4();
-    await sql`INSERT INTO gig_assignments (id, gig_id, bee_id, honey_split) VALUES (${assignId}, ${gigId}, ${bid.bee_id}, 100)`;
-    await sql`UPDATE gigs SET status = 'in_progress', updated_at = NOW() WHERE id = ${gigId}`;
+      // Update bid statuses
+      const bidUpdateResult = await client.query(
+        `UPDATE bids SET status = 'accepted' WHERE id = $1`,
+        [bidId]
+      );
+      console.log(`[acceptBid:pg] Updated bid to accepted, rowCount=${bidUpdateResult.rowCount}`);
+      
+      await client.query(
+        `UPDATE bids SET status = 'rejected' WHERE gig_id = $1 AND id != $2`,
+        [gigId, bidId]
+      );
 
-    return { success: true };
+      // Create assignment
+      const assignId = uuidv4();
+      await client.query(
+        `INSERT INTO gig_assignments (id, gig_id, bee_id, honey_split) VALUES ($1, $2, $3, 100)`,
+        [assignId, gigId, bid.bee_id]
+      );
+      console.log(`[acceptBid:pg] Created assignment id=${assignId}`);
+
+      // Update gig status
+      const gigUpdateResult = await client.query(
+        `UPDATE gigs SET status = 'in_progress', updated_at = NOW() WHERE id = $1`,
+        [gigId]
+      );
+      console.log(`[acceptBid:pg] Updated gig to in_progress, rowCount=${gigUpdateResult.rowCount}`);
+
+      await client.query('COMMIT');
+      console.log(`[acceptBid:pg] Transaction committed successfully`);
+      return { success: true };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error(`[acceptBid:pg] Transaction rolled back:`, error);
+      return { success: false, error: error instanceof Error ? error.message : 'Transaction failed' };
+    } finally {
+      client.release();
+    }
   } else {
     const gig = db.prepare('SELECT * FROM gigs WHERE id = ? AND user_id = ?').get(gigId, userId) as any;
     if (!gig) return { success: false, error: 'Gig not found' };
