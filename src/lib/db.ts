@@ -1928,7 +1928,6 @@ export async function getBeeByApiKey(apiKey: string, allowSleeping = false) {
       return null;
     }
     
-    await sql`UPDATE bees SET last_seen_at = NOW() WHERE api_key = ${apiKey}`;
     return bee;
   } else {
     const bee = db.prepare('SELECT * FROM bees WHERE api_key = ?').get(apiKey) as any;
@@ -1939,7 +1938,6 @@ export async function getBeeByApiKey(apiKey: string, allowSleeping = false) {
       return null;
     }
     
-    db.prepare('UPDATE bees SET last_seen_at = CURRENT_TIMESTAMP WHERE api_key = ?').run(apiKey);
     return bee;
   }
 }
