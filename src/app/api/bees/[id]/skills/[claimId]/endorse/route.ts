@@ -45,7 +45,7 @@ export async function POST(
     
     // Rate limit: 1 endorsement per minute
     const entityId = endorserBeeId || endorserUserId!;
-    const rateCheck = await checkRateLimit(endorserType, entityId, 'endorse');
+    const rateCheck = await checkRateLimit(endorserType === 'human' ? 'user' : 'bee', entityId, 'endorse');
     if (!rateCheck.allowed) {
       return Response.json({
         error: `Slow down! Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`,
@@ -56,7 +56,7 @@ export async function POST(
     const result = await endorseSkillClaim(claimId, endorserType, endorserBeeId, endorserUserId);
     
     if (!result.alreadyEndorsed) {
-      await recordAction(endorserType, entityId, 'endorse');
+      await recordAction(endorserType === 'human' ? 'user' : 'bee', entityId, 'endorse');
     }
     
     if (result.alreadyEndorsed) {

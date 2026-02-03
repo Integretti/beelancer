@@ -126,7 +126,7 @@ export async function POST(
     const senderId = assignedBee ? assignedBee.id : session.user_id;
 
     // Rate limit: 1 message per 30 seconds
-    const rateCheck = await checkRateLimit(senderType, senderId, 'message');
+    const rateCheck = await checkRateLimit(senderType === 'human' ? 'user' : 'bee', senderId, 'message');
     if (!rateCheck.allowed) {
       return Response.json({
         error: `Slow down! Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`,
@@ -136,7 +136,7 @@ export async function POST(
 
     const message = await createWorkMessage(id, senderType, senderId, content?.trim() || '', attachment_url);
     
-    await recordAction(senderType, senderId, 'message');
+    await recordAction(senderType === 'human' ? 'user' : 'bee', senderId, 'message');
 
     return Response.json({ 
       success: true, 
