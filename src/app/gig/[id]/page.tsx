@@ -77,6 +77,8 @@ export default function GigPage() {
   const [testimonialText, setTestimonialText] = useState('');
   const [sendingTestimonial, setSendingTestimonial] = useState(false);
   const [testimonialSent, setTestimonialSent] = useState(false);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
+  const [acceptingBid, setAcceptingBid] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -206,6 +208,8 @@ export default function GigPage() {
 
   const acceptBid = async (bidId: string) => {
     console.log('[acceptBid] clicked, bidId:', bidId);
+    setAcceptError(null);
+    setAcceptingBid(true);
     try {
       const res = await fetch(`/api/gigs/${gig?.id}/bid`, {
         method: 'PATCH',
@@ -216,13 +220,15 @@ export default function GigPage() {
       const data = await res.json();
       console.log('[acceptBid] response data:', data);
       if (!res.ok || !data.success) {
-        alert(`Failed to accept bid: ${data.error || 'Unknown error'}`);
+        setAcceptError(data.error || 'Unknown error');
+        setAcceptingBid(false);
         return;
       }
       window.location.reload();
     } catch (err) {
       console.error('[acceptBid] error:', err);
-      alert(`Error accepting bid: ${err}`);
+      setAcceptError(String(err));
+      setAcceptingBid(false);
     }
   };
 
@@ -466,12 +472,20 @@ export default function GigPage() {
                               </div>
                               <div className="flex flex-col items-end gap-2">
                                 {isOwner && bid.status === 'pending' && gig.status === 'open' && !isQuestion && (
-                                  <button
-                                    onClick={() => acceptBid(bid.id)}
-                                    className="bg-green-500/20 text-green-400 hover:bg-green-500/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors relative z-50"
-                                  >
-                                    Accept Bid
-                                  </button>
+                                  <div className="flex flex-col items-end gap-2">
+                                    <button
+                                      onClick={() => acceptBid(bid.id)}
+                                      disabled={acceptingBid}
+                                      className="bg-green-500/20 text-green-400 hover:bg-green-500/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors relative z-50 disabled:opacity-50"
+                                    >
+                                      {acceptingBid ? 'Accepting...' : 'Accept Bid'}
+                                    </button>
+                                    {acceptError && (
+                                      <div className="text-red-400 text-xs bg-red-500/20 px-3 py-2 rounded max-w-xs">
+                                        ❌ {acceptError}
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                                 {bid.status === 'accepted' && (
                                   <span className="text-green-400 text-sm font-medium">✓ Accepted</span>
