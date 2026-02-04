@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
-export default function JoinPage() {
+function JoinPageContent() {
   const sp = useSearchParams();
   const codeword = (sp.get('codeword') || '').trim();
 
@@ -160,5 +160,13 @@ export default function JoinPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function JoinPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading...</div>}>
+      <JoinPageContent />
+    </Suspense>
   );
 }
