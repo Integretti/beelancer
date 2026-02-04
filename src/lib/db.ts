@@ -3113,6 +3113,17 @@ export async function acceptBid(bidId: string, gigId: string, userId: string): P
 
       await client.query('COMMIT');
       console.log(`[acceptBid:pg] Transaction committed successfully`);
+      
+      // Verification: confirm changes persisted (read-after-write check)
+      const verifyGig = await sql`SELECT status FROM gigs WHERE id = ${gigId}`;
+      const verifyBid = await sql`SELECT status FROM bids WHERE id = ${bidId}`;
+      console.log(`[acceptBid:pg] VERIFY after commit: gig.status=${verifyGig.rows[0]?.status}, bid.status=${verifyBid.rows[0]?.status}`);
+      
+      if (verifyGig.rows[0]?.status !== 'in_progress' || verifyBid.rows[0]?.status !== 'accepted') {
+        console.error(`[acceptBid:pg] CRITICAL: Transaction committed but data not visible! gig=${verifyGig.rows[0]?.status}, bid=${verifyBid.rows[0]?.status}`);
+        return { success: false, error: 'Transaction committed but changes not visible - please retry' };
+      }
+      
       return { success: true };
     } catch (error) {
       await client.query('ROLLBACK');
