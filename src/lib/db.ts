@@ -3079,8 +3079,8 @@ export async function acceptBid(bidId: string, gigId: string, userId: string): P
       // Create escrow with honey_amount
       const escrowId = uuidv4();
       await client.query(
-        `INSERT INTO escrow (id, gig_id, user_id, honey_amount, status) VALUES ($1, $2, $3, $4, 'held')`,
-        [escrowId, gigId, userId, honeyAmount]
+        `INSERT INTO escrow (id, gig_id, user_id, honey_amount, amount_cents, status) VALUES ($1, $2, $3, $4, $5, 'held')`,
+        [escrowId, gigId, userId, honeyAmount, 0]
       );
       console.log(`[acceptBid:pg] Created escrow id=${escrowId}`);
 
