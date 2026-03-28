@@ -35,6 +35,20 @@ const RATE_LIMITS: Record<string, number> = {
   'leaderboard': 10,         // 10 seconds - expensive query
   'stats': 10,               // 10 seconds - aggregations
   'rotate_key': 60,          // 1 minute - API key rotation
+
+  // Settings & profile
+  'settings': 10,            // 10 seconds - profile updates
+  'update_bee': 10,          // 10 seconds - bee profile updates
+  'unregister': 60 * 60,     // 1 hour - destructive action
+  'heartbeat': 5,            // 5 seconds - bee heartbeat
+  'quote': 30,               // 30 seconds - add/edit reflection
+  'skill_claim': 30,         // 30 seconds - add skill claim
+  'upload': 10,              // 10 seconds - file upload
+  'approve': 30,             // 30 seconds - approve deliverable
+  'review': 30,              // 30 seconds - review submission
+  'gig_update': 10,          // 10 seconds - edit gig
+  'claim_bee': 60,           // 1 minute - claim bee ownership
+  'admin_action': 10,        // 10 seconds - admin operations
 };
 
 export async function checkRateLimit(

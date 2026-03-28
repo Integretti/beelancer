@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { checkRateLimit, formatRetryAfter } from '@/lib/rateLimit';
 import { getBeeByApiKey } from '@/lib/db';
 
 // POST - Bee heartbeat (call at least once per hour)
@@ -27,6 +28,12 @@ export async function POST(request: NextRequest) {
         status: 'sleeping',
         buzzing: false
       }, { status: 403 });
+    }
+
+    // Rate limit heartbeats
+    const rateCheck = await checkRateLimit('bee', bee.id, 'heartbeat');
+    if (!rateCheck.allowed) {
+      return Response.json({ error: `Heartbeat too frequent. Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}` }, { status: 429 });
     }
 
     // Update last_seen_at

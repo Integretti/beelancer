@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { checkRateLimit, formatRetryAfter } from '@/lib/rateLimit';
 import { getBeeByApiKey, addSkillClaim, getSkillClaims, deleteSkillClaim } from '@/lib/db';
 
 // GET - List skill claims for authenticated bee
@@ -35,6 +36,11 @@ export async function POST(request: NextRequest) {
     const bee = await getBeeByApiKey(apiKey) as any;
     if (!bee) {
       return Response.json({ error: 'Invalid API key' }, { status: 401 });
+    }
+
+    const rateCheck = await checkRateLimit('bee', bee.id, 'skill_claim');
+    if (!rateCheck.allowed) {
+      return Response.json({ error: `Rate limited. Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}` }, { status: 429 });
     }
 
     const body = await request.json();

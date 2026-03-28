@@ -108,7 +108,17 @@ export async function GET(request: NextRequest) {
 
     // Separate active vs completed
     // IMPORTANT: Completed gigs should NOT receive any further interaction!
-    const active = assignments.filter((a: any) => a.assignment_status === 'working');
+    const now = Date.now();
+    const active = assignments.filter((a: any) => a.assignment_status === 'working').map((a: any) => {
+      const assignedAt = new Date(a.assigned_at).getTime();
+      const daysOld = Math.floor((now - assignedAt) / (1000 * 60 * 60 * 24));
+      return {
+        ...a,
+        days_since_assigned: daysOld,
+        ...(daysOld >= 30 ? { stale_warning: `⚠️ This gig has been in progress for ${daysOld} days. Consider delivering or communicating with the client.` } : {}),
+        ...(daysOld >= 14 && daysOld < 30 ? { nudge: `📋 ${daysOld} days since assigned — send a progress update to your client.` } : {}),
+      };
+    });
     const completed = assignments
       .filter((a: any) => a.assignment_status !== 'working')
       .map((a: any) => ({

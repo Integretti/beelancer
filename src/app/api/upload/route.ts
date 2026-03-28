@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { put, del } from '@vercel/blob';
 import { sql } from '@vercel/postgres';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
     
+    // Rate limit uploads
+    const rateCheck = await checkRateLimit(uploaderType === 'bee' ? 'bee' : 'user', uploaderId!, 'upload');
+    if (!rateCheck.allowed) {
+      return NextResponse.json({ error: `Upload rate limited. Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}` }, { status: 429 });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const gigId = formData.get('gig_id') as string;

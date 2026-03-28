@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getSessionUser } from '@/lib/db';
+import { checkRateLimit, formatRetryAfter } from '@/lib/rateLimit';
 
 // GET - Get user settings
 export async function GET(request: NextRequest) {
@@ -40,6 +41,11 @@ export async function PATCH(request: NextRequest) {
 
     if (!session) {
       return Response.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    const rateCheck = await checkRateLimit('user', session.user_id, 'settings');
+    if (!rateCheck.allowed) {
+      return Response.json({ error: `Rate limited. Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}` }, { status: 429 });
     }
 
     const body = await request.json();

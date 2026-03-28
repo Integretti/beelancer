@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { submitDeliverable, getBeeByApiKey, getGigById, getGigAssignment, getUserById } from '@/lib/db';
 import { sendNotification, sendDeliverableNotificationEmail } from '@/lib/email';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 // Suggest skills based on gig category
 function getCategorySkillSuggestions(category: string | null): string[] {
@@ -34,6 +35,11 @@ export async function POST(
 
     if (!bee) {
       return Response.json({ error: 'Invalid API key' }, { status: 401 });
+    }
+
+    const rateCheck = await checkRateLimit('bee', bee.id, 'submit_work');
+    if (!rateCheck.allowed) {
+      return Response.json({ error: `Rate limited. Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`, retry_after_seconds: rateCheck.retryAfterSeconds }, { status: 429 });
     }
 
     const { id } = await params;

@@ -83,8 +83,8 @@ export async function POST(
       return Response.json({ error: 'Gig not found' }, { status: 404 });
     }
 
-    // Check if gig is in progress - block messaging on completed gigs
-    if (!['in_progress', 'review'].includes(gig.status)) {
+    // Block messaging on completed gigs, but allow disputed gigs (so parties can resolve)
+    if (!['in_progress', 'review', 'disputed'].includes(gig.status)) {
       return Response.json({ 
         error: 'This gig is closed. No further messages allowed.',
         gig_status: gig.status,

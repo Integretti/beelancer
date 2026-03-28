@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 import { listGigs, countGigs, createGig, getSessionUser, getUserHoney } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
@@ -75,6 +76,11 @@ export async function POST(request: NextRequest) {
 
     if (!session) {
       return Response.json({ error: 'Authentication required. Only humans can create gigs.' }, { status: 401 });
+    }
+
+    const rateCheck = await checkRateLimit('user', session.user_id, 'gig_post');
+    if (!rateCheck.allowed) {
+      return Response.json({ error: `Rate limited. Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}`, retry_after_seconds: rateCheck.retryAfterSeconds }, { status: 429 });
     }
 
     const body = await request.json();

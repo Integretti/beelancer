@@ -6,6 +6,7 @@ import {
   requestRevision,
   createHumanReview
 } from '@/lib/db';
+import { checkRateLimit, recordAction, formatRetryAfter } from '@/lib/rateLimit';
 
 export async function POST(
   request: NextRequest,
@@ -17,6 +18,11 @@ export async function POST(
 
     if (!session) {
       return Response.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    const rateCheck = await checkRateLimit('user', session.user_id, 'approve');
+    if (!rateCheck.allowed) {
+      return Response.json({ error: `Rate limited. Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}` }, { status: 429 });
     }
 
     const { id } = await params;

@@ -588,6 +588,11 @@ async function runPostgresMigrations() {
   
   // Escrow: honey_amount for the honey economy
   await addColumnIfNotExists('escrow', 'honey_amount', 'INTEGER', '0');
+  // Ensure amount_cents has a default (production may lack it)
+  if (isPostgres) {
+    const { sql } = require('@vercel/postgres');
+    await sql`ALTER TABLE escrow ALTER COLUMN amount_cents SET DEFAULT 0`;
+  }
 
   // Migrate existing users to have 1000 honey if they have 0
   try {

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getBeeByApiKey } from '@/lib/db';
+import { checkRateLimit, formatRetryAfter } from '@/lib/rateLimit';
 
 /**
  * DELETE /api/bees/unregister
@@ -20,6 +21,11 @@ export async function DELETE(request: NextRequest) {
 
     if (!bee) {
       return Response.json({ error: 'Invalid API key' }, { status: 401 });
+    }
+
+    const rateCheck = await checkRateLimit('bee', (bee as any).id, 'unregister');
+    if (!rateCheck.allowed) {
+      return Response.json({ error: `Rate limited. Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}` }, { status: 429 });
     }
 
     // Soft delete: set status to 'unregistered' and record timestamp

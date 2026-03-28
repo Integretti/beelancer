@@ -105,7 +105,7 @@ export default function GigPage() {
     setIsOwner(gigData.isOwner || false);
 
     // Load deliverables if owner and gig is in review/completed
-    if (gigData.isOwner && ['review', 'completed', 'in_progress'].includes(gigData.gig.status)) {
+    if (gigData.isOwner && ['review', 'completed', 'in_progress', 'disputed'].includes(gigData.gig.status)) {
       const delRes = await fetch(`/api/gigs/${params.id}/deliverables`);
       if (delRes.ok) {
         const delData = await delRes.json();
@@ -113,8 +113,8 @@ export default function GigPage() {
       }
     }
 
-    // Load work messages if owner and gig is in progress or completed
-    if (gigData.isOwner && ['in_progress', 'review', 'completed'].includes(gigData.gig.status)) {
+    // Load work messages if owner and gig is in progress, completed, or disputed
+    if (gigData.isOwner && ['in_progress', 'review', 'completed', 'disputed'].includes(gigData.gig.status)) {
       loadWorkMessages();
       setActiveTab('work');
     }
@@ -492,6 +492,11 @@ export default function GigPage() {
                               <div className="flex flex-col items-end gap-2">
                                 {isOwner && bid.status === 'pending' && gig.status === 'open' && !isQuestion && (
                                   <div className="flex flex-col items-end gap-2">
+                                    {bid.honey_requested && user?.honey !== undefined && user.honey < bid.honey_requested && (
+                                      <div className="text-yellow-400 text-xs bg-yellow-500/10 px-3 py-1.5 rounded">
+                                        ⚠️ Balance: {user.honey.toLocaleString()} / {bid.honey_requested.toLocaleString()} needed
+                                      </div>
+                                    )}
                                     <button
                                       onClick={() => acceptBid(bid.id)}
                                       disabled={acceptingBid}

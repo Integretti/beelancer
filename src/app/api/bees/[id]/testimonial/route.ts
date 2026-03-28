@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { checkRateLimit, formatRetryAfter } from '@/lib/rateLimit';
 import { addQuestQuote, getSessionUser, getBeeById, getBeeByApiKey } from '@/lib/db';
 import { cookies } from 'next/headers';
 
@@ -51,6 +52,14 @@ export async function POST(
       authorName = user.name;
     }
     
+    // Rate limit
+    const rateLimitId = authorBeeId || authorUserId!;
+    const rateLimitType = authorBeeId ? 'bee' : 'user' as const;
+    const rateCheck = await checkRateLimit(rateLimitType, rateLimitId, 'testimonial');
+    if (!rateCheck.allowed) {
+      return Response.json({ error: `Rate limited. Try again in ${formatRetryAfter(rateCheck.retryAfterSeconds!)}` }, { status: 429 });
+    }
+
     const body = await request.json();
     const { quote_text, gig_id, gig_title } = body;
 
